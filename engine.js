@@ -58,6 +58,9 @@
       log: [],
       rng: rng
     };
+    // Opening price by tier: tier 1 opens at 5% of the budget, the lowest tier at the minimum bid, evenly spaced between.
+    var n = opts.names.length, top = Math.max(g.minBid, Math.round(budget * 0.05));
+    g.lots.forEach(function (l) { l.open = n === 1 ? top : Math.round(g.minBid + (top - g.minBid) * (n - l.tier) / (n - 1)); });
     return g;
   }
 
@@ -80,7 +83,7 @@
       g.lotIndex++;
       if (g.lotIndex >= g.lots.length) { g.phase = 'done'; g.current = null; return; }
       var who = needers(g);
-      if (who.length === 1) { assign(g, who[0], g.minBid, 'last'); continue; }
+      if (who.length === 1) { assign(g, who[0], basePrice(g, who[0]), 'last'); continue; }
       g.phase = 'bidding';
       g.current = { bid: null, leader: null, endsAt: now + g.timerMs, passed: {} };
       return;
@@ -90,7 +93,9 @@
   function start(g, now) { nextLot(g, now); }
 
   // Amount the manager would bid by pressing +inc.
-  function nextAmount(g, inc) { return g.current.bid === null ? g.minBid : g.current.bid + inc; }
+  function nextAmount(g, inc) { return g.current.bid === null ? lot(g).open : g.current.bid + inc; }
+  // Base value for an automatic assignment: the tier's opening price, capped so the manager can still finish his squad.
+  function basePrice(g, mi) { return Math.max(g.minBid, Math.min(lot(g).open, maxBid(g, g.managers[mi]))); }
 
   function canBid(g, mi, inc) {
     if (g.phase !== 'bidding') return false;
@@ -134,7 +139,8 @@
       var who = needers(g), top = -1;
       who.forEach(function (i) { if (g.managers[i].money > top) top = g.managers[i].money; });
       var richest = who.filter(function (i) { return g.managers[i].money === top; });
-      assign(g, richest[Math.floor(g.rng() * richest.length)], g.minBid, 'unsold');
+      var winner = richest[Math.floor(g.rng() * richest.length)];
+      assign(g, winner, basePrice(g, winner), 'unsold');
     }
     nextLot(g, now);
   }

@@ -49,3 +49,8 @@ details summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
 .slots div { flex: 1; height: 22px; border-radius: 5px; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); color: var(--muted); }
 .slots div.done { background: var(--gold); color: #2A1E05; border-color: var(--gold); }
 .slots div.now { border-color: var(--gold); color: var(--gold); }
+.pitch { border-radius: 16px; border: 2px solid #2F7A52; background: repeating-linear-gradient(180deg, #1C5A3A 0, #1C5A3A 60px, #1A5236 60px, #1A5236 120px); padding: 12px 4px; display: flex; flex-direction: column; gap: 10px; position: relative; }
+.pitch::before { content: ''; position: absolute; left: 50%; top: 50%; width: 90px; height: 90px; margin: -45px 0 0 -45px; border: 1.5px solid rgba(255,255,255,.18); border-radius: 50%; }
+.pline { display: flex; justify-content: center; gap: 4px; position: relative; }
+.pcell { width: 25%; max-width: 92px; }
+.pitch .muted { color: #CFE8DA; }

@@ -143,7 +143,7 @@
     if (H.screen === 'auction' && g && g.phase === 'bidding') {
       var l = E.lot(g), c = g.current, st = E.slotType(l.pos);
       v.auction = {
-        lotNo: g.lotIndex + 1, lotsTotal: g.lots.length, slotLabel: st.label, pos: l.pos, minBid: g.minBid,
+        lotNo: g.lotIndex + 1, lotsTotal: g.lots.length, slotLabel: st.label, pos: l.pos, minBid: l.open,
         player: { name: l.player.name, tier: l.tier, club: l.player.club, league: l.player.league, nation: l.player.nation, prime: l.player.prime, wiki: l.player.wiki },
         round: g.lots.map(function (x, i) { return { name: x.player.name, tier: x.tier, pos: x.pos, st: i < g.lotIndex ? 'past' : i === g.lotIndex ? 'now' : 'next' }; }).filter(function (x) { return x.pos === l.pos; }),
         bid: c.bid, leader: c.leader, remainingMs: Math.max(0, c.endsAt - Date.now()), passed: Object.keys(c.passed).map(Number),
@@ -250,7 +250,7 @@
       '<div class="row muted small"><div style="flex:1;height:1px;background:var(--line)"></div>or<div style="flex:1;height:1px;background:var(--line)"></div></div>' +
       '<button class="btn-outline" data-act="create"' + (busy ? ' disabled' : '') + '>CREATE A ROOM</button>' +
       (S.error ? '<div class="warn">' + esc(S.error) + '</div>' : '') +
-      '<details class="panel small"><summary>How to play</summary><div class="muted" style="line-height:1.55">One person creates a room and shares the code (keep that tab open; the game lives in the host\'s browser). Everyone else joins on their own phone. Players come up one position at a time: GK, RB, two CBs, LB, RM, two CMs, LM, two STs, then a manager. Each position has as many tiers as managers and is auctioned from tier 1 (best) down. Everyone sees each player\'s tier, but nobody sees ratings until the end. Every lot opens at the minimum bid; a bid in the last 5 seconds resets the clock to 5. If nobody bids, the player goes to whoever has the most money left and still needs that position. When all squads are done, ratings are revealed and the pundit picks a winner.</div></details>' +
+      '<details class="panel small"><summary>How to play</summary><div class="muted" style="line-height:1.55">One person creates a room and shares the code (keep that tab open; the game lives in the host\'s browser). Everyone else joins on their own phone. Players come up one position at a time: GK, RB, two CBs, LB, RM, two CMs, LM, two STs, then a manager. Each position has as many tiers as managers and is auctioned from tier 1 (best) down. Everyone sees each player\'s tier, but nobody sees ratings until the end. Tier 1 players open at the highest price and lower tiers open lower; a bid in the last 5 seconds resets the clock to 5. If nobody bids, the player goes at his opening price to whoever has the most money left and still needs that position. When all squads are done, ratings are revealed and the pundit picks a winner.</div></details>' +
       '<div class="small muted" style="text-align:center">No accounts, nothing stored. Player photos: Wikimedia Commons.</div>' +
       '</div>';
   }
@@ -299,7 +299,7 @@
     if (!e) return '';
     var who = '<strong>' + esc(e.manager) + '</strong>';
     if (e.how === 'sold') return 'SOLD: ' + esc(e.player) + ' → ' + who + ' for ' + money(e.price);
-    if (e.how === 'unsold') return 'No bids: ' + esc(e.player) + ' → ' + who + ' (most money left) for ' + money(e.price);
+    if (e.how === 'unsold') return 'No bids: ' + esc(e.player) + ' → ' + who + ' (most money left) at base value ' + money(e.price);
     return 'Only ' + who + ' still needed a ' + esc(e.pos) + ': ' + esc(e.player) + ' for ' + money(e.price);
   }
 
@@ -347,11 +347,25 @@
       (c.chem === null ? '' : '<div class="small" style="color:var(--gold);letter-spacing:1px">' + diamonds(c.chem) + '</div>') + '</div>';
   }
 
+  // Squad drawn as a 4-4-2 on a pitch, manager underneath.
+  function pitch(cards) {
+    var by = {}; cards.forEach(function (c) { (by[c.pos] = by[c.pos] || []).push(c); });
+    var get = function (pos, k) { return (by[pos] || [])[k || 0]; };
+    var line = function (list) { return '<div class="pline">' + list.filter(Boolean).map(function (c) { return '<div class="pcell">' + cardHtml(c) + '</div>'; }).join('') + '</div>'; };
+    var mgr = get('MGR');
+    return '<div class="pitch">' +
+      line([get('ST', 0), get('ST', 1)]) +
+      line([get('LM'), get('CM', 0), get('CM', 1), get('RM')]) +
+      line([get('LB'), get('CB', 0), get('CB', 1), get('RB')]) +
+      line([get('GK')]) + '</div>' +
+      (mgr ? '<div class="row" style="gap:12px;justify-content:center;margin-top:8px"><div style="width:80px">' + cardHtml(mgr) + '</div><div class="small muted">Manager</div></div>' : '');
+  }
+
   function renderReveal(v) {
     var r = v.reveal, host = S.role === 'host', last = r.index === r.of - 1;
     app.innerHTML = '<div class="stack">' +
       '<div style="text-align:center"><div class="small" style="color:var(--gold);font-weight:700;letter-spacing:1.5px">THE REVEAL · TEAM ' + (r.index + 1) + ' OF ' + r.of + '</div><h1 class="display" style="font-size:36px">' + esc(r.name.toUpperCase()) + '</h1></div>' +
-      '<div class="grid4">' + r.cards.map(cardHtml).join('') + '</div>' +
+      pitch(r.cards) +
       '<div class="panel"><div class="row between"><span class="small muted" style="font-weight:700">TEAM CHEMISTRY</span><span class="display" style="font-size:22px;color:var(--gold)">' + r.chem + ' / 33</span></div>' +
       '<div style="height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px"><div style="height:100%;width:' + Math.round(r.chem / 33 * 100) + '%;background:var(--gold)"></div></div>' +
       '<div class="small muted" style="margin-top:8px">Card colour = tier (gold is best). ◆ = chemistry points.</div></div>' +
@@ -371,7 +385,7 @@
     }).join('');
     var smartName = r.rows.filter(function (x) { return x.index === r.smart.index; })[0];
     var squads = r.rows.map(function (x) {
-      return '<details class="panel"><summary>' + esc(x.name) + ' · spent ' + money(x.spent) + '</summary><div class="grid4" style="margin-top:8px">' + r.squads[x.index].map(cardHtml).join('') + '</div></details>';
+      return '<details class="panel"><summary>' + esc(x.name) + ' · spent ' + money(x.spent) + '</summary><div style="margin-top:8px">' + pitch(r.squads[x.index]) + '</div></details>';
     }).join('');
     app.innerHTML = '<div class="stack">' +
       '<div style="text-align:center"><div class="small" style="color:var(--gold);font-weight:700;letter-spacing:1.5px">FULL TIME</div><h1 class="display" style="font-size:32px">' + esc(r.headline || (r.rows[0].name.toUpperCase() + ' WIN')) + '</h1></div>' +
