@@ -46,7 +46,7 @@
     var g = {
       budget: budget,
       minBid: Math.max(1, Math.round(budget / 140)),
-      timerMs: (opts.timerSec || 15) * 1000,
+      timerMs: (opts.timerSec || 180) * 1000,
       managers: opts.names.map(function (name) {
         var squad = {}; SLOT_TYPES.forEach(function (s) { squad[s.pos] = []; });
         return { name: name, money: budget, squad: squad };

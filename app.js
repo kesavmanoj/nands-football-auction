@@ -14,6 +14,7 @@
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function money(x) { return '$' + x + 'M'; }
+  function clock(secs) { return secs >= 60 ? Math.floor(secs / 60) + ':' + ('0' + (secs % 60)).slice(-2) : String(secs); }
   function diamonds(n) { return '◆◆◆'.slice(0, n) + '◇◇◇'.slice(0, 3 - n); }
   function newCode() { var a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = ''; for (var i = 0; i < 5; i++) s += a[Math.floor(Math.random() * a.length)]; return s; }
   function getKey() { try { return localStorage.getItem('nfa-groq-key') || ''; } catch (e) { return ''; } }
@@ -27,7 +28,7 @@
     var code = newCode();
     var peer = new Peer(PREFIX + code, { config: ICE });
     peer.on('open', function () {
-      H = { peer: peer, conns: {}, lobby: [{ name: name, peerId: null, online: true }], settings: { budget: 700, timer: 15 }, key: getKey(), remember: !!getKey(),
+      H = { peer: peer, conns: {}, lobby: [{ name: name, peerId: null, online: true }], settings: { budget: 700, timer: 180 }, key: getKey(), remember: !!getKey(),
         g: null, screen: 'lobby', reveal: 0, result: null, judging: false, judgeNote: '' };
       S.role = 'host'; S.code = code; S.myName = name; S.me = 0; S.connecting = false; S.screen = 'game';
       hostBroadcast();
@@ -250,7 +251,7 @@
       '<div class="row muted small"><div style="flex:1;height:1px;background:var(--line)"></div>or<div style="flex:1;height:1px;background:var(--line)"></div></div>' +
       '<button class="btn-outline" data-act="create"' + (busy ? ' disabled' : '') + '>CREATE A ROOM</button>' +
       (S.error ? '<div class="warn">' + esc(S.error) + '</div>' : '') +
-      '<details class="panel small"><summary>How to play</summary><div class="muted" style="line-height:1.55">One person creates a room and shares the code (keep that tab open; the game lives in the host\'s browser). Everyone else joins on their own phone. Players come up one position at a time: GK, RB, two CBs, LB, RM, two CMs, LM, two STs, then a manager. Each position has as many tiers as managers and is auctioned from tier 1 (best) down. Everyone sees each player\'s tier, but nobody sees ratings until the end. Tier 1 players open at the highest price and lower tiers open lower; a bid in the last 5 seconds resets the clock to 5. If nobody bids, the player goes at his opening price to whoever has the most money left and still needs that position. When all squads are done, ratings are revealed and the pundit picks a winner.</div></details>' +
+      '<details class="panel small"><summary>How to play</summary><div class="muted" style="line-height:1.55">One person creates a room and shares the code (keep that tab open; the game lives in the host\'s browser). Everyone else joins on their own phone. Players come up one position at a time: GK, RB, two CBs, LB, RM, two CMs, LM, two STs, then a manager. Each position has as many tiers as managers and is auctioned from tier 1 (best) down. Everyone sees each player\'s tier, but nobody sees ratings until the end. Tier 1 players open at the highest price and lower tiers open lower; each player gets up to 3 minutes (the host can change this), and the lot ends early once everyone else has passed. A bid in the last 5 seconds resets the clock to 5. If nobody bids, the player goes at his opening price to whoever has the most money left and still needs that position. When all squads are done, ratings are revealed and the pundit picks a winner.</div></details>' +
       '<div class="small muted" style="text-align:center">No accounts, nothing stored. Player photos: Wikimedia Commons.</div>' +
       '</div>';
   }
@@ -268,12 +269,12 @@
     }).join('');
     var settings = host
       ? '<div class="row"><div style="flex:1"><label for="budget">BUDGET</label><select id="budget">' + opt([300, 400, 500, 600, 700, 800, 900], v.settings.budget, money) + '</select></div>' +
-        '<div style="flex:1"><label for="timer">BID TIMER</label><select id="timer">' + opt([10, 15, 20], v.settings.timer, function (x) { return x + ' sec'; }) + '</select></div></div>' +
+        '<div style="flex:1"><label for="timer">TIME PER PLAYER</label><select id="timer">' + opt([60, 120, 180, 300], v.settings.timer, function (x) { return (x / 60) + ' min'; }) + '</select></div></div>' +
         '<details' + (H.key ? '' : ' open') + '><summary class="small">AI pundit (optional)</summary><div class="stack" style="gap:8px;margin-top:6px">' +
         '<div class="small muted">Paste your free Groq API key to have the AI judge the squads. It stays on this device and only goes to Groq. Without it, a built-in formula scores the game.</div>' +
         '<input id="groq" type="password" autocomplete="off" placeholder="gsk_…" value="' + esc(H.key) + '">' +
         '<label class="row small" style="gap:8px"><input id="remember" type="checkbox" style="width:20px;height:20px"' + (H.remember ? ' checked' : '') + '> Remember on this device</label></div></details>'
-      : '<div class="row between small"><span class="muted">Budget</span><strong>' + money(v.settings.budget) + '</strong></div><div class="row between small"><span class="muted">Bid timer</span><strong>' + v.settings.timer + ' sec</strong></div><div class="row between small"><span class="muted">Judge</span><strong>' + (v.hasKey ? 'AI pundit' : 'Built-in formula') + '</strong></div>';
+      : '<div class="row between small"><span class="muted">Budget</span><strong>' + money(v.settings.budget) + '</strong></div><div class="row between small"><span class="muted">Time per player</span><strong>' + (v.settings.timer / 60) + ' min</strong></div><div class="row between small"><span class="muted">Judge</span><strong>' + (v.hasKey ? 'AI pundit' : 'Built-in formula') + '</strong></div>';
     app.innerHTML = '<div class="stack">' +
       '<div class="t1" style="border-radius:18px;padding:16px 18px"><div class="small" style="font-weight:700;letter-spacing:1px">ROOM CODE</div><div class="display" style="font-size:48px;letter-spacing:8px;line-height:1">' + esc(v.code) + '</div>' +
       '<div class="small" style="margin-top:4px">Friends open this site and type the code.</div></div>' +
@@ -303,6 +304,19 @@
     return 'Only ' + who + ' still needed a ' + esc(e.pos) + ': ' + esc(e.player) + ' for ' + money(e.price);
   }
 
+  // Who the lot is still waiting on: it ends as soon as everyone else has passed (or the clock runs out).
+  function waitingLine(a) {
+    var waiting = [], passed = [];
+    a.managers.forEach(function (m, i) {
+      if (!m.needs || a.leader === i) return;
+      if (a.passed.indexOf(i) >= 0) passed.push(m.name); else waiting.push(m.name);
+    });
+    var bits = [];
+    if (passed.length) bits.push('<span style="color:var(--red);font-weight:700">Passed:</span> ' + passed.map(esc).join(', '));
+    if (waiting.length) bits.push('<span style="color:var(--gold);font-weight:700">Still deciding:</span> ' + waiting.map(esc).join(', '));
+    return bits.length ? '<div class="panel small">' + bits.join('<br>') + '</div>' : '';
+  }
+
   function renderAuction(v) {
     var a = v.auction, p = a.player, me = a.managers[S.me];
     var secs = Math.max(0, Math.ceil((S.endsAt - Date.now()) / 1000));
@@ -316,8 +330,11 @@
     else if (a.bid === null) controls = '<div class="row"><button class="btn-green" style="flex:1" data-act="bid" data-inc="1"' + (can(1) ? '' : ' disabled') + '>OPEN AT ' + money(a.minBid) + '</button><button data-act="pass" style="height:56px">Pass</button></div>';
     else controls = '<div class="bids">' + [1, 5, 10].map(function (inc) { return '<button data-act="bid" data-inc="' + inc + '"' + (can(inc) ? '' : ' disabled') + '>' + money(next(inc)) + '</button>'; }).join('') + '</div><button data-act="pass">Pass</button>';
     var others = a.managers.map(function (m, i) {
-      var status = !m.needs ? 'done' : a.leader === i ? 'leading' : a.passed.indexOf(i) >= 0 ? 'passed' : 'in';
-      return '<tr><td><strong>' + esc(m.name) + '</strong>' + (i === S.me ? ' <span class="muted">(you)</span>' : '') + (m.online ? '' : ' <span style="color:var(--red)">offline</span>') + '</td><td>' + money(m.money) + '</td><td>' + m.filled + '/12</td><td class="muted">' + status + '</td></tr>';
+      var status = !m.needs ? '<span class="chip" style="background:#26304A;color:var(--muted)">Has one</span>'
+        : a.leader === i ? '<span class="chip" style="background:rgba(61,220,151,.15);color:var(--green)">Leading</span>'
+        : a.passed.indexOf(i) >= 0 ? '<span class="chip" style="background:rgba(242,139,130,.15);color:var(--red)">PASSED</span>'
+        : '<span class="chip" style="background:rgba(232,199,102,.12);color:var(--gold)">Deciding…</span>';
+      return '<tr><td><strong>' + esc(m.name) + '</strong>' + (i === S.me ? ' <span class="muted">(you)</span>' : '') + (m.online ? '' : ' <span style="color:var(--red)">offline</span>') + '</td><td>' + money(m.money) + '</td><td>' + m.filled + '/12</td><td>' + status + '</td></tr>';
     }).join('');
     app.innerHTML = '<div class="stack">' +
       '<div class="row between"><div><div class="small muted">LOT ' + a.lotNo + ' / ' + a.lotsTotal + '</div><div class="display" style="font-size:24px">' + esc(a.slotLabel.toUpperCase()) + '</div></div>' +
@@ -329,10 +346,10 @@
       '<img class="photo" alt="' + esc(p.name) + '" data-photo="' + esc(p.wiki) + '" style="visibility:hidden">' +
       '<div class="info"><div class="display" style="font-size:' + (p.name.length > 12 ? 22 : 28) + 'px;line-height:1">' + esc(p.name.toUpperCase()) + '</div>' +
       '<div style="font-size:12px;font-weight:600">' + esc(p.club) + '</div><div style="font-size:11px;font-weight:700">' + esc(p.league) + '</div><div style="font-size:11px;font-weight:700">PRIME ' + esc(p.prime) + '</div></div></div>' +
-      '<div style="text-align:center;min-width:90px"><div id="timer" class="display" style="font-size:56px;line-height:1">' + secs + '</div><div class="small muted">seconds</div>' +
+      '<div style="text-align:center;min-width:90px"><div id="timer" class="display" style="font-size:44px;line-height:1">' + clock(secs) + '</div><div class="small muted">time left</div>' +
       '<div class="display" style="font-size:28px;margin-top:10px">' + (a.bid === null ? '—' : money(a.bid)) + '</div>' +
       '<div class="chip" style="margin-top:4px;' + (a.leader === null ? 'background:#26304A;color:var(--muted)' : 'background:rgba(61,220,151,.15);color:var(--green)') + '">' + (a.leader === null ? 'No bids yet' : esc(a.managers[a.leader].name) + (lead ? ' (you)' : '')) + '</div></div></div>' +
-      controls +
+      controls + waitingLine(a) +
       (a.log ? '<div class="toast">' + logLine(a.log) + '</div>' : '') +
       '<div class="panel"><table><thead><tr><th>Manager</th><th>Money</th><th>Squad</th><th>This lot</th></tr></thead><tbody>' + others + '</tbody></table></div>' +
       (S.role === 'host' ? '<div class="small muted" style="text-align:center">You\'re hosting: keep this tab open and your screen on.</div>' : '') +
@@ -412,7 +429,7 @@
   function tickTimer() {
     var el = document.getElementById('timer'); if (!el) return;
     var secs = Math.max(0, Math.ceil((S.endsAt - Date.now()) / 1000));
-    el.textContent = secs; el.style.color = secs <= 5 ? 'var(--gold)' : 'var(--ink)';
+    el.textContent = clock(secs); el.style.color = secs <= 10 ? 'var(--gold)' : 'var(--ink)';
   }
 
   // =====================================================================
