@@ -118,7 +118,7 @@
     var key = H.key;
     if (key) {
       H.judging = true; hostBroadcast();
-      var teams = H.g.managers.map(function (m, i) { return { index: i, cards: squads[i] }; });
+      var teams = H.g.managers.map(function (m, i) { return { index: i, chem: E.chemistry(m).total, cards: squads[i] }; });
       Judge.run(key, teams).then(function (ai) {
         H.result.rows.forEach(function (r) {
           var t = ai.byIndex[r.index]; if (!t) return;
@@ -129,7 +129,8 @@
         });
         H.result.rows.sort(function (a, b) { return b.total - a.total || b.quality - a.quality; });
         if (ai.smart) H.result.smart = ai.smart;
-        H.result.headline = ai.headline; H.result.by = 'ai';
+        var champ = ai.byIndex[H.result.rows[0].index];
+        H.result.headline = (champ && champ.headline_if_winner) || ''; H.result.by = 'ai';
       }).catch(function (e) {
         H.judgeNote = 'The AI pundit could not be reached (' + e.message + '), so the built-in formula scored this game.';
       }).then(function () { H.judging = false; hostBroadcast(); });
