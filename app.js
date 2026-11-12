@@ -144,8 +144,8 @@
       var l = E.lot(g), c = g.current, st = E.slotType(l.pos);
       v.auction = {
         lotNo: g.lotIndex + 1, lotsTotal: g.lots.length, slotLabel: st.label, pos: l.pos, minBid: g.minBid,
-        player: { name: l.player.name, club: l.player.club, league: l.player.league, nation: l.player.nation, prime: l.player.prime, wiki: l.player.wiki },
-        round: g.lots.map(function (x, i) { return { name: x.player.name, pos: x.pos, st: i < g.lotIndex ? 'past' : i === g.lotIndex ? 'now' : 'next' }; }).filter(function (x) { return x.pos === l.pos; }),
+        player: { name: l.player.name, tier: l.tier, club: l.player.club, league: l.player.league, nation: l.player.nation, prime: l.player.prime, wiki: l.player.wiki },
+        round: g.lots.map(function (x, i) { return { name: x.player.name, tier: x.tier, pos: x.pos, st: i < g.lotIndex ? 'past' : i === g.lotIndex ? 'now' : 'next' }; }).filter(function (x) { return x.pos === l.pos; }),
         bid: c.bid, leader: c.leader, remainingMs: Math.max(0, c.endsAt - Date.now()), passed: Object.keys(c.passed).map(Number),
         managers: g.managers.map(function (m, i) {
           var done = {}; E.SLOT_TYPES.forEach(function (s) { done[s.pos] = m.squad[s.pos].length; });
@@ -250,7 +250,7 @@
       '<div class="row muted small"><div style="flex:1;height:1px;background:var(--line)"></div>or<div style="flex:1;height:1px;background:var(--line)"></div></div>' +
       '<button class="btn-outline" data-act="create"' + (busy ? ' disabled' : '') + '>CREATE A ROOM</button>' +
       (S.error ? '<div class="warn">' + esc(S.error) + '</div>' : '') +
-      '<details class="panel small"><summary>How to play</summary><div class="muted" style="line-height:1.55">One person creates a room and shares the code (keep that tab open; the game lives in the host\'s browser). Everyone else joins on their own phone. Players come up one position at a time: GK, RB, two CBs, LB, RM, two CMs, LM, two STs, then a manager. Each position has as many tiers as managers, and nobody can see ratings until the end. Every lot opens at the minimum bid; a bid in the last 5 seconds resets the clock to 5. If nobody bids, the player goes to whoever has the most money left and still needs that position. When all squads are done, ratings are revealed and the pundit picks a winner.</div></details>' +
+      '<details class="panel small"><summary>How to play</summary><div class="muted" style="line-height:1.55">One person creates a room and shares the code (keep that tab open; the game lives in the host\'s browser). Everyone else joins on their own phone. Players come up one position at a time: GK, RB, two CBs, LB, RM, two CMs, LM, two STs, then a manager. Each position has as many tiers as managers and is auctioned from tier 1 (best) down. Everyone sees each player\'s tier, but nobody sees ratings until the end. Every lot opens at the minimum bid; a bid in the last 5 seconds resets the clock to 5. If nobody bids, the player goes to whoever has the most money left and still needs that position. When all squads are done, ratings are revealed and the pundit picks a winner.</div></details>' +
       '<div class="small muted" style="text-align:center">No accounts, nothing stored. Player photos: Wikimedia Commons.</div>' +
       '</div>';
   }
@@ -323,9 +323,9 @@
       '<div class="row between"><div><div class="small muted">LOT ' + a.lotNo + ' / ' + a.lotsTotal + '</div><div class="display" style="font-size:24px">' + esc(a.slotLabel.toUpperCase()) + '</div></div>' +
       (me ? '<div style="text-align:right"><div class="display" style="font-size:24px;color:var(--gold)">' + money(me.money) + ' left</div><div class="small muted">Max bid ' + money(Math.max(0, me.maxBid)) + '</div></div>' : '') + '</div>' +
       (me ? slotStrip(me.done, a.pos) : '') +
-      '<div class="small muted">This round: ' + a.round.map(function (x) { return '<span class="' + (x.st === 'past' ? 'strike' : '') + '"' + (x.st === 'now' ? ' style="color:var(--gold);font-weight:700"' : '') + '>' + esc(x.name) + '</span>'; }).join(' · ') + '</div>' +
+      '<div class="small muted">This round: ' + a.round.map(function (x) { return '<span class="' + (x.st === 'past' ? 'strike' : '') + '"' + (x.st === 'now' ? ' style="color:var(--gold);font-weight:700"' : '') + '>' + esc(x.name) + ' <b>T' + x.tier + '</b></span>'; }).join(' · ') + '</div>' +
       '<div class="row" style="justify-content:center;gap:14px">' +
-      '<div class="shield t1 bigcard"><div class="ovr"><div class="display" style="font-size:42px;line-height:1">??</div><div class="display" style="font-size:18px">' + esc(a.pos) + '</div><span class="tag">' + esc(p.nation) + '</span></div>' +
+      '<div class="shield t' + Math.min(4, p.tier) + ' bigcard"><div class="ovr"><div class="display" style="font-size:42px;line-height:1">??</div><div class="display" style="font-size:18px">' + esc(a.pos) + '</div><span class="tag">' + esc(p.nation) + '</span><span class="tag" style="margin-top:2px">TIER ' + p.tier + '</span></div>' +
       '<img class="photo" alt="' + esc(p.name) + '" data-photo="' + esc(p.wiki) + '" style="visibility:hidden">' +
       '<div class="info"><div class="display" style="font-size:' + (p.name.length > 12 ? 22 : 28) + 'px;line-height:1">' + esc(p.name.toUpperCase()) + '</div>' +
       '<div style="font-size:12px;font-weight:600">' + esc(p.club) + '</div><div style="font-size:11px;font-weight:700">' + esc(p.league) + '</div><div style="font-size:11px;font-weight:700">PRIME ' + esc(p.prime) + '</div></div></div>' +

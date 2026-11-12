@@ -34,7 +34,8 @@
         var picks = shuffle(cands.slice(t * band, (t + 1) * band), rng).slice(0, st.count);
         picks.forEach(function (p) { slotLots.push({ player: p, pos: st.pos, tier: t + 1 }); });
       }
-      shuffle(slotLots, rng).forEach(function (l) { lots.push(l); });
+      // Auctioned from tier 1 (best) down; within a tier the order is random.
+      slotLots.forEach(function (l) { lots.push(l); });
     });
     return lots;
   }
