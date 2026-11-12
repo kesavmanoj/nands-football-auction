@@ -22,10 +22,12 @@
   }
   function slotType(pos) { for (var i = 0; i < SLOT_TYPES.length; i++) if (SLOT_TYPES[i].pos === pos) return SLOT_TYPES[i]; }
 
-  var LAST_TIER_BELOW = 80; // players rated under this are the "nobody wants him" pool used only for the last tier
+  var LAST_TIER_BELOW = 86;   // players rated under this are only ever used for the last tier
+  var DECENT_FROM = 80;       // last-tier players rated 80-85 are "decent"; under 80 are flops
+  var WILDCARD_CHANCE = 0.35; // chance each last-tier pick is a decent player instead of a flop
 
-  // For each slot: the last tier always comes from the low-rated pool; the good players are ranked and
-  // split into the other n - 1 tiers (tier 1 = best). `count` players are drawn from each tier.
+  // For each slot: the good players (86+) are ranked and split into tiers 1 to n - 1 (tier 1 = best).
+  // The last tier is a lucky dip: usually a flop, sometimes a decent player. `count` players per tier.
   function buildLots(db, n, rng) {
     var lots = [];
     SLOT_TYPES.forEach(function (st) {
@@ -40,7 +42,13 @@
         var picks = shuffle(good.slice(t * band, (t + 1) * band), rng).slice(0, st.count);
         picks.forEach(function (p) { slotLots.push({ player: p, pos: st.pos, tier: t + 1 }); });
       }
-      shuffle(low, rng).slice(0, st.count).forEach(function (p) { slotLots.push({ player: p, pos: st.pos, tier: n }); });
+      var decent = shuffle(low.filter(function (p) { return p.rating >= DECENT_FROM; }), rng);
+      var flops = shuffle(low.filter(function (p) { return p.rating < DECENT_FROM; }), rng);
+      for (var k = 0; k < st.count; k++) {
+        var pickDecent = decent.length && (rng() < WILDCARD_CHANCE || !flops.length);
+        var p = pickDecent ? decent.shift() : flops.shift();
+        slotLots.push({ player: p, pos: st.pos, tier: n });
+      }
       // Auctioned from tier 1 (best) down; within a tier the order is random.
       slotLots.forEach(function (l) { lots.push(l); });
     });
