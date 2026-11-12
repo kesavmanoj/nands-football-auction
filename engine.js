@@ -22,18 +22,25 @@
   }
   function slotType(pos) { for (var i = 0; i < SLOT_TYPES.length; i++) if (SLOT_TYPES[i].pos === pos) return SLOT_TYPES[i]; }
 
-  // For each slot: rank candidates, split into n bands (tier 1 = best), draw `count` from each band.
+  var LAST_TIER_BELOW = 80; // players rated under this are the "nobody wants him" pool used only for the last tier
+
+  // For each slot: the last tier always comes from the low-rated pool; the good players are ranked and
+  // split into the other n - 1 tiers (tier 1 = best). `count` players are drawn from each tier.
   function buildLots(db, n, rng) {
     var lots = [];
     SLOT_TYPES.forEach(function (st) {
-      var cands = db.filter(function (p) { return p.pos === st.pos; }).sort(function (a, b) { return b.rating - a.rating; });
-      var band = Math.floor(cands.length / n);
+      var all = db.filter(function (p) { return p.pos === st.pos; }).sort(function (a, b) { return b.rating - a.rating; });
+      var good = all.filter(function (p) { return p.rating >= LAST_TIER_BELOW; });
+      var low = all.filter(function (p) { return p.rating < LAST_TIER_BELOW; });
+      if (low.length < st.count) throw new Error('Not enough last-tier ' + st.label + ' players');
+      var bands = n - 1, band = Math.floor(good.length / bands);
       if (band < st.count) throw new Error('Not enough ' + st.label + ' players for ' + n + ' managers');
       var slotLots = [];
-      for (var t = 0; t < n; t++) {
-        var picks = shuffle(cands.slice(t * band, (t + 1) * band), rng).slice(0, st.count);
+      for (var t = 0; t < bands; t++) {
+        var picks = shuffle(good.slice(t * band, (t + 1) * band), rng).slice(0, st.count);
         picks.forEach(function (p) { slotLots.push({ player: p, pos: st.pos, tier: t + 1 }); });
       }
+      shuffle(low, rng).slice(0, st.count).forEach(function (p) { slotLots.push({ player: p, pos: st.pos, tier: n }); });
       // Auctioned from tier 1 (best) down; within a tier the order is random.
       slotLots.forEach(function (l) { lots.push(l); });
     });

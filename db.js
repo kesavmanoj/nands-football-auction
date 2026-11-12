@@ -59,7 +59,26 @@
     'Ancelotti|MGR|Real Madrid|LL|ITA|2021–24|92', 'Klopp|MGR|Liverpool|PL|GER|2018–22|92', 'Sacchi|MGR|AC Milan|SA|ITA|1988–90|90',
     'Cruyff|MGR|Barcelona|LL|NED|1990–94|91', 'Wenger|MGR|Arsenal|PL|FRA|1998–2004|90', 'Zidane (manager)|MGR|Real Madrid|LL|FRA|2016–18|89',
     'Heynckes|MGR|Bayern Munich|BL|GER|2012–13|88', 'Simeone|MGR|Atlético Madrid|LL|ARG|2013–16|88', 'Lippi|MGR|Juventus|SA|ITA|1995–98|89',
-    'Capello|MGR|AC Milan|SA|ITA|1992–96|88'
+    'Capello|MGR|AC Milan|SA|ITA|1992–96|88',
+    // ---- Last-tier pool: players everyone knows but nobody wants (rating under 80) ----
+    'Scott Carson|GK|West Bromwich Albion|PL|ENG|2008–11|74', 'Karius|GK|Liverpool|PL|GER|2016–18|76', 'Taibi|GK|Manchester United|PL|ITA|1999–2000|70',
+    'Roy Carroll|GK|Manchester United|PL|NIR|2001–05|73', 'Rob Green|GK|West Ham United|PL|ENG|2006–12|75', 'Kepa|GK|Chelsea|PL|ESP|2018–20|78',
+    'Wan-Bissaka|RB|Manchester United|PL|ENG|2019–22|78', 'Zappacosta|RB|Chelsea|PL|ITA|2017–19|75', 'Rafael|RB|Manchester United|PL|BRA|2010–14|77',
+    'Calum Chambers|RB|Arsenal|PL|ENG|2014–17|73', 'Debuchy|RB|Arsenal|PL|FRA|2014–16|75',
+    'Phil Jones|CB|Manchester United|PL|ENG|2012–17|76', 'Maguire|CB|Manchester United|PL|ENG|2019–21|79', 'Mustafi|CB|Arsenal|PL|GER|2016–19|76',
+    'Titus Bramble|CB|Newcastle United|PL|ENG|2002–07|71', 'Bailly|CB|Manchester United|PL|CIV|2016–19|77', 'Lovren|CB|Liverpool|PL|CRO|2014–19|78',
+    'Brandon Williams|LB|Manchester United|PL|ENG|2019–21|71', 'Marcos Alonso|LB|Chelsea|PL|ESP|2016–20|79', 'Danny Rose|LB|Tottenham|PL|ENG|2015–18|78',
+    'Cissokho|LB|Liverpool|PL|FRA|2013–14|71', 'José Enrique|LB|Liverpool|PL|ESP|2011–13|75',
+    'Lingard|RM|Manchester United|PL|ENG|2017–19|77', 'Walcott|RM|Arsenal|PL|ENG|2012–16|79', 'Wright-Phillips|RM|Chelsea|PL|ENG|2005–08|76',
+    'Aaron Lennon|RM|Tottenham|PL|ENG|2006–12|77', 'Ashley Young|RM|Manchester United|PL|ENG|2011–15|78',
+    'Kléberson|CM|Manchester United|PL|BRA|2003–05|72', 'Djemba-Djemba|CM|Manchester United|PL|CMR|2003–05|69', 'Drinkwater|CM|Chelsea|PL|ENG|2017–19|75',
+    'Bakayoko|CM|Chelsea|PL|FRA|2017–18|75', 'Fred|CM|Manchester United|PL|BRA|2018–23|78', 'Cleverley|CM|Manchester United|PL|ENG|2011–14|74',
+    'Downing|LM|Liverpool|PL|ENG|2011–13|75', 'Gervinho|LM|Arsenal|PL|CIV|2011–13|75', 'Memphis|LM|Manchester United|PL|NED|2015–17|76',
+    'Albert Riera|LM|Liverpool|PL|ESP|2008–10|74', 'Townsend|LM|Tottenham|PL|ENG|2013–16|73',
+    'Andy Carroll|ST|Liverpool|PL|ENG|2011–13|74', 'Heskey|ST|Liverpool|PL|ENG|2000–04|76', 'Bendtner|ST|Arsenal|PL|DEN|2008–11|73',
+    'Van Wolfswinkel|ST|Norwich City|PL|NED|2013–14|69', 'Macheda|ST|Manchester United|PL|ITA|2009–11|70', 'Balotelli|ST|Manchester City|PL|ITA|2010–13|79',
+    'Moyes|MGR|Manchester United|PL|SCO|2013–14|72', 'Frank de Boer|MGR|Crystal Palace|PL|NED|2017|68', 'Solskjær|MGR|Manchester United|PL|NOR|2019–21|77',
+    'Tim Sherwood|MGR|Tottenham|PL|ENG|2014|69', 'McClaren|MGR|Newcastle United|PL|ENG|2015–16|70'
   ];
   // Wikipedia article titles, used to look up a free-licence photo from Wikimedia Commons.
   var WIKI = {
@@ -93,7 +112,17 @@
     'Raúl': 'Raúl (footballer)', 'Gerd Müller': 'Gerd Müller',
     'Ferguson': 'Alex Ferguson', 'Guardiola': 'Pep Guardiola', 'Mourinho': 'José Mourinho', 'Ancelotti': 'Carlo Ancelotti', 'Klopp': 'Jürgen Klopp',
     'Sacchi': 'Arrigo Sacchi', 'Cruyff': 'Johan Cruyff', 'Wenger': 'Arsène Wenger', 'Zidane (manager)': 'Zinedine Zidane', 'Heynckes': 'Jupp Heynckes',
-    'Simeone': 'Diego Simeone', 'Lippi': 'Marcello Lippi', 'Capello': 'Fabio Capello'
+    'Simeone': 'Diego Simeone', 'Lippi': 'Marcello Lippi', 'Capello': 'Fabio Capello',
+    'Scott Carson': 'Scott Carson', 'Karius': 'Loris Karius', 'Taibi': 'Massimo Taibi', 'Roy Carroll': 'Roy Carroll', 'Rob Green': 'Robert Green', 'Kepa': 'Kepa Arrizabalaga',
+    'Wan-Bissaka': 'Aaron Wan-Bissaka', 'Zappacosta': 'Davide Zappacosta', 'Rafael': 'Rafael (footballer, born 1990)', 'Calum Chambers': 'Calum Chambers', 'Debuchy': 'Mathieu Debuchy',
+    'Phil Jones': 'Phil Jones (footballer, born 1992)', 'Maguire': 'Harry Maguire', 'Mustafi': 'Shkodran Mustafi', 'Titus Bramble': 'Titus Bramble', 'Bailly': 'Eric Bailly', 'Lovren': 'Dejan Lovren',
+    'Brandon Williams': 'Brandon Williams (footballer, born 2000)', 'Marcos Alonso': 'Marcos Alonso (footballer, born 1990)', 'Danny Rose': 'Danny Rose (footballer, born 1990)',
+    'Cissokho': 'Aly Cissokho', 'José Enrique': 'José Enrique (footballer)',
+    'Lingard': 'Jesse Lingard', 'Walcott': 'Theo Walcott', 'Wright-Phillips': 'Shaun Wright-Phillips', 'Aaron Lennon': 'Aaron Lennon', 'Ashley Young': 'Ashley Young',
+    'Kléberson': 'Kléberson', 'Djemba-Djemba': 'Eric Djemba-Djemba', 'Drinkwater': 'Danny Drinkwater', 'Bakayoko': 'Tiémoué Bakayoko', 'Fred': 'Fred (footballer, born 1993)', 'Cleverley': 'Tom Cleverley',
+    'Downing': 'Stewart Downing', 'Gervinho': 'Gervinho', 'Memphis': 'Memphis Depay', 'Albert Riera': 'Albert Riera', 'Townsend': 'Andros Townsend',
+    'Andy Carroll': 'Andy Carroll', 'Heskey': 'Emile Heskey', 'Bendtner': 'Nicklas Bendtner', 'Van Wolfswinkel': 'Ricky van Wolfswinkel', 'Macheda': 'Federico Macheda', 'Balotelli': 'Mario Balotelli',
+    'Moyes': 'David Moyes', 'Frank de Boer': 'Frank de Boer', 'Solskjær': 'Ole Gunnar Solskjær', 'Tim Sherwood': 'Tim Sherwood', 'McClaren': 'Steve McClaren'
   };
   var DB = RAW.map(function (line, i) {
     var f = line.split('|');
