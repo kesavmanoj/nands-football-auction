@@ -208,7 +208,39 @@
     return { rows: rows, smartBusiness: best };
   }
 
-  var api = { SLOT_TYPES: SLOT_TYPES, TOTAL_SLOTS: TOTAL_SLOTS, createGame: createGame, start: start, bid: bid, pass: pass, tick: tick,
+  // ---------- League: every team plays every other team home and away ----------
+  // teams: [{ index, name, strength (0-100) }]. Goals per match are drawn from a Poisson distribution
+  // whose average depends on the strength gap, with a small home advantage. Same seed = same season.
+  function seeded(seed) {
+    var a = seed >>> 0;
+    return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  function poisson(lambda, rng) { var L = Math.exp(-lambda), k = 0, p = 1; do { k++; p *= rng(); } while (p > L); return k - 1; }
+  function league(teams, seed) {
+    var rng = seeded(seed), legs = teams.length === 2 ? 4 : 2;
+    var rows = {};
+    teams.forEach(function (t) { rows[t.index] = { index: t.index, name: t.name, strength: t.strength, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }; });
+    var results = [];
+    for (var leg = 0; leg < legs; leg++) {
+      teams.forEach(function (h, i) {
+        teams.forEach(function (aw, j) {
+          if (i >= j) return;
+          var home = leg % 2 === 0 ? h : aw, away = leg % 2 === 0 ? aw : h;
+          var diff = (home.strength - away.strength) / 12;
+          var hg = poisson(1.4 * Math.exp(diff + 0.12), rng), ag = poisson(1.4 * Math.exp(-diff - 0.12), rng);
+          results.push({ round: leg + 1, home: home.index, away: away.index, hg: hg, ag: ag });
+          var H = rows[home.index], A = rows[away.index];
+          H.p++; A.p++; H.gf += hg; H.ga += ag; A.gf += ag; A.ga += hg;
+          if (hg > ag) { H.w++; H.pts += 3; A.l++; } else if (hg < ag) { A.w++; A.pts += 3; H.l++; } else { H.d++; A.d++; H.pts++; A.pts++; }
+        });
+      });
+    }
+    var table = Object.keys(rows).map(function (k) { return rows[k]; });
+    table.sort(function (x, y) { return y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf || y.strength - x.strength; });
+    return { table: table, results: results, legs: legs };
+  }
+
+  var api = { league: league, SLOT_TYPES: SLOT_TYPES, TOTAL_SLOTS: TOTAL_SLOTS, createGame: createGame, start: start, bid: bid, pass: pass, tick: tick,
     canBid: canBid, nextAmount: nextAmount, maxBid: maxBid, needs: needs, filled: filled, lot: lot, chemistry: chemistry, score: score, slotType: slotType };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Engine = api;
 })(this);

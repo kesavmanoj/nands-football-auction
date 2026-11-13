@@ -101,11 +101,35 @@
     E.SLOT_TYPES.forEach(function (s) {
       m.squad[s.pos].forEach(function (e) {
         var p = e.player;
-        out.push({ pos: s.pos, name: p.name, club: p.club, nation: p.nation, league: p.league, prime: p.prime, rating: p.rating, tier: e.tier, price: e.price, wiki: p.wiki,
+        out.push({ pos: s.pos, name: p.name, club: p.club, nation: p.nation, league: p.league, prime: p.prime, rating: p.rating, tier: e.tier, last: e.tier === H.g.managers.length && H.g.managers.length > 1, price: e.price, wiki: p.wiki,
           chem: s.pos === 'MGR' ? null : (chemPer[p.id] || 0) });
       });
     });
     return out;
+  }
+
+  // Ratings -> strengths -> a full league season. The league champion is the overall winner.
+  function playLeague() {
+    var r = H.result;
+    r.rows.forEach(function (x) { x.total = Math.round((x.quality * 7 + x.balance * 2 + x.chem / 33 * 10) * 10) / 10; });
+    r.league = E.league(r.rows.map(function (x) { return { index: x.index, name: x.name, strength: x.total }; }), H.leagueSeed);
+    var pos = {}; r.league.table.forEach(function (t, i) { pos[t.index] = i; });
+    r.rows.sort(function (a, b) { return pos[a.index] - pos[b.index]; });
+    var champ = r.ai && r.ai.byIndex[r.rows[0].index];
+    r.headline = (champ && champ.headline_if_winner) || '';
+  }
+
+  function applyAI(ai, by) {
+    var r = H.result;
+    r.rows.forEach(function (x) {
+      var t = ai.byIndex[x.index]; if (!t) return;
+      x.quality = t.quality; x.balance = t.balance;
+      x.verdict = t.verdict || ''; x.best = t.best_signing || ''; x.weak = t.weak_link || '';
+    });
+    if (ai.smart) r.smart = ai.smart;
+    r.ai = { byIndex: ai.byIndex }; r.by = by;
+    H.judgeNote = ''; H.manual = false;
+    playLeague();
   }
 
   function hostFinish() {
@@ -114,28 +138,26 @@
     H.g.managers.forEach(function (m, i) { squads[i] = cardsOf(m, E.chemistry(m).per); });
     H.result = { rows: sc.rows.map(function (r) { return { index: r.index, name: r.name, quality: r.quality, balance: r.balance, chem: r.chem, total: r.total, spent: r.spent, verdict: '', best: '', weak: '' }; }),
       smart: { index: sc.smartBusiness.index, reason: 'Most quality per dollar spent.' }, headline: '', by: 'formula', squads: squads };
+    H.leagueSeed = Math.floor(Math.random() * 1e9);
+    H.prompt = Judge.buildPrompt(H.g.managers.map(function (m, i) { return { index: i, chem: E.chemistry(m).total, cards: squads[i] }; }));
+    H.manualError = '';
+    playLeague();
     H.screen = 'results';
-    var key = H.key;
-    if (key) {
-      H.judging = true; hostBroadcast();
-      var teams = H.g.managers.map(function (m, i) { return { index: i, chem: E.chemistry(m).total, cards: squads[i] }; });
-      Judge.run(key, teams).then(function (ai) {
-        H.result.rows.forEach(function (r) {
-          var t = ai.byIndex[r.index]; if (!t) return;
-          r.quality = Math.max(0, Math.min(10, Math.round(Number(t.quality) * 10) / 10 || r.quality));
-          r.balance = Math.max(0, Math.min(10, Math.round(Number(t.balance) * 10) / 10 || r.balance));
-          r.total = Math.round((r.quality * 7 + r.balance * 2 + r.chem / 33 * 10) * 10) / 10;
-          r.verdict = t.verdict || ''; r.best = t.best_signing || ''; r.weak = t.weak_link || '';
-        });
-        H.result.rows.sort(function (a, b) { return b.total - a.total || b.quality - a.quality; });
-        if (ai.smart) H.result.smart = ai.smart;
-        var champ = ai.byIndex[H.result.rows[0].index];
-        H.result.headline = (champ && champ.headline_if_winner) || ''; H.result.by = 'ai';
-      }).catch(function (e) {
-        H.judgeNote = 'The AI pundit could not be reached (' + e.message + '), so the built-in formula scored this game.';
+    if (H.key) {
+      H.judging = true; H.manual = false; hostBroadcast();
+      Judge.run(H.key, H.prompt).then(function (ai) { applyAI(ai, 'ai'); }).catch(function (e) {
+        H.judgeNote = 'The AI pundit (Groq) could not be reached (' + e.message + '). The league below uses the built-in formula for now.';
+        H.manual = true;
       }).then(function () { H.judging = false; hostBroadcast(); });
+    } else {
+      H.manual = true;
     }
     hostBroadcast();
+  }
+
+  function hostPasteReply(text) {
+    try { applyAI(Judge.parse(H.prompt, text), 'chatgpt'); hostBroadcast(); }
+    catch (e) { H.manualError = 'Could not read that reply: ' + e.message + '. Paste ChatGPT\'s whole answer, including the { } part.'; render(); }
   }
 
   // What everyone is allowed to see. Ratings and tiers are never included until the reveal.
@@ -147,7 +169,11 @@
       v.auction = {
         lotNo: g.lotIndex + 1, lotsTotal: g.lots.length, slotLabel: st.label, pos: l.pos, minBid: l.open,
         player: { name: l.player.name, tier: l.tier, club: l.player.club, league: l.player.league, nation: l.player.nation, prime: l.player.prime, wiki: l.player.wiki },
-        round: g.lots.map(function (x, i) { return { name: x.player.name, tier: x.tier, pos: x.pos, st: i < g.lotIndex ? 'past' : i === g.lotIndex ? 'now' : 'next' }; }).filter(function (x) { return x.pos === l.pos; }),
+        tiers: g.managers.length,
+        round: g.lots.map(function (x, i) {
+          var sold = g.log.filter(function (e) { return e.lot === i; })[0];
+          return { name: x.player.name, tier: x.tier, pos: x.pos, open: x.open, st: i < g.lotIndex ? 'past' : i === g.lotIndex ? 'now' : 'next', buyer: sold ? sold.manager : '', price: sold ? sold.price : null };
+        }).filter(function (x) { return x.pos === l.pos; }),
         bid: c.bid, leader: c.leader, remainingMs: Math.max(0, c.endsAt - Date.now()), passed: Object.keys(c.passed).map(Number),
         managers: g.managers.map(function (m, i) {
           var done = {}; E.SLOT_TYPES.forEach(function (s) { done[s.pos] = m.squad[s.pos].length; });
@@ -161,7 +187,8 @@
       v.reveal = { index: H.reveal, of: g.managers.length, name: m.name, chem: chem.total, cards: cardsOf(m, chem.per) };
     }
     if (H.screen === 'results' && H.result) {
-      v.results = H.result; v.judging = H.judging; v.judgeNote = H.judgeNote;
+      v.results = { rows: H.result.rows, smart: H.result.smart, headline: H.result.headline, by: H.result.by, squads: H.result.squads, league: H.result.league };
+      v.judging = H.judging; v.judgeNote = H.judgeNote; v.manual = !!H.manual;
     }
     return v;
   }
@@ -305,17 +332,14 @@
     return 'Only ' + who + ' still needed a ' + esc(e.pos) + ': ' + esc(e.player) + ' for ' + money(e.price);
   }
 
-  // Who the lot is still waiting on: it ends as soon as everyone else has passed (or the clock runs out).
-  function waitingLine(a) {
-    var waiting = [], passed = [];
-    a.managers.forEach(function (m, i) {
-      if (!m.needs || a.leader === i) return;
-      if (a.passed.indexOf(i) >= 0) passed.push(m.name); else waiting.push(m.name);
-    });
-    var bits = [];
-    if (passed.length) bits.push('<span style="color:var(--red);font-weight:700">Passed:</span> ' + passed.map(esc).join(', '));
-    if (waiting.length) bits.push('<span style="color:var(--gold);font-weight:700">Still deciding:</span> ' + waiting.map(esc).join(', '));
-    return bits.length ? '<div class="panel small">' + bits.join('<br>') + '</div>' : '';
+  function tierClass(tier, tiers) { return tier === tiers && tiers > 1 ? 'tlast' : 't' + Math.min(4, tier); }
+  function tierLabel(tier, tiers) { return 'TIER ' + tier + (tier === tiers && tiers > 1 ? ' · LUCKY DIP' : ''); }
+
+  function statusChip(a, m, i) {
+    if (!m.needs) return '<span class="chip" style="background:#26304A;color:var(--muted)">Has one</span>';
+    if (a.leader === i) return '<span class="chip" style="background:rgba(61,220,151,.15);color:var(--green)">Leading</span>';
+    if (a.passed.indexOf(i) >= 0) return '<span class="chip" style="background:rgba(242,139,130,.15);color:var(--red)">PASSED</span>';
+    return '<span class="chip" style="background:rgba(232,199,102,.12);color:var(--gold)">Deciding…</span>';
   }
 
   function renderAuction(v) {
@@ -324,42 +348,49 @@
     var lead = a.leader === S.me, passed = a.passed.indexOf(S.me) >= 0;
     var next = function (inc) { return a.bid === null ? a.minBid : a.bid + inc; };
     var can = function (inc) { return me && me.needs && !lead && !passed && next(inc) <= me.maxBid; };
+    var plural = a.pos === 'CB' || a.pos === 'CM' || a.pos === 'ST' ? 's' : '';
     var controls;
-    if (!me || !me.needs) controls = '<div class="panel small muted" style="text-align:center">You already have your ' + esc(a.slotLabel.toLowerCase()) + (a.pos === 'CB' || a.pos === 'CM' || a.pos === 'ST' ? 's' : '') + '. Sit back and watch.</div>';
+    if (!me || !me.needs) controls = '<div class="panel small muted" style="text-align:center">You already have your ' + esc(a.slotLabel.toLowerCase()) + plural + '. Sit back and watch.</div>';
     else if (lead) controls = '<div class="panel" style="text-align:center;border-color:var(--green);color:var(--green);font-weight:700">You\'re the top bidder</div>';
     else if (passed) controls = '<div class="panel small muted" style="text-align:center">You passed on this one.</div>';
-    else if (a.bid === null) controls = '<div class="row"><button class="btn-green" style="flex:1" data-act="bid" data-inc="1"' + (can(1) ? '' : ' disabled') + '>OPEN AT ' + money(a.minBid) + '</button><button data-act="pass" style="height:56px">Pass</button></div>';
-    else controls = '<div class="bids">' + [1, 5, 10].map(function (inc) { return '<button data-act="bid" data-inc="' + inc + '"' + (can(inc) ? '' : ' disabled') + '>' + money(next(inc)) + '</button>'; }).join('') + '</div><button data-act="pass">Pass</button>';
-    var others = a.managers.map(function (m, i) {
-      var status = !m.needs ? '<span class="chip" style="background:#26304A;color:var(--muted)">Has one</span>'
-        : a.leader === i ? '<span class="chip" style="background:rgba(61,220,151,.15);color:var(--green)">Leading</span>'
-        : a.passed.indexOf(i) >= 0 ? '<span class="chip" style="background:rgba(242,139,130,.15);color:var(--red)">PASSED</span>'
-        : '<span class="chip" style="background:rgba(232,199,102,.12);color:var(--gold)">Deciding…</span>';
-      return '<tr><td><strong>' + esc(m.name) + '</strong>' + (i === S.me ? ' <span class="muted">(you)</span>' : '') + (m.online ? '' : ' <span style="color:var(--red)">offline</span>') + '</td><td>' + money(m.money) + '</td><td>' + m.filled + '/12</td><td>' + status + '</td></tr>';
+    else if (a.bid === null) controls = '<div class="row"><button class="btn-green" style="flex:1" data-act="bid" data-inc="1"' + (can(1) ? '' : ' disabled') + '>OPEN AT ' + money(a.minBid) + '</button><button class="btn-pass" data-act="pass">PASS</button></div>';
+    else controls = '<div class="bids">' + [1, 5, 10].map(function (inc) { return '<button data-act="bid" data-inc="' + inc + '"' + (can(inc) ? '' : ' disabled') + '><span class="small muted">+' + inc + '</span><br>' + money(next(inc)) + '</button>'; }).join('') + '</div><button class="btn-pass" data-act="pass" style="width:100%">PASS</button>';
+
+    // Tier ladder: every player in this position, best tier first.
+    var ladder = a.round.map(function (x) {
+      var sub = x.st === 'past' ? (x.buyer ? esc(x.buyer) + ' · ' + money(x.price) : 'sold')
+        : x.st === 'now' ? 'NOW · opens ' + money(x.open) : 'opens ' + money(x.open);
+      return '<div class="rung ' + tierClass(x.tier, a.tiers) + ' ' + x.st + '"><div class="rt">T' + x.tier + '</div><div class="rn">' + esc(x.name) + '</div><div class="rs">' + sub + '</div></div>';
     }).join('');
-    app.innerHTML = '<div class="stack">' +
-      '<div class="row between"><div><div class="small muted">LOT ' + a.lotNo + ' / ' + a.lotsTotal + '</div><div class="display" style="font-size:24px">' + esc(a.slotLabel.toUpperCase()) + '</div></div>' +
-      (me ? '<div style="text-align:right"><div class="display" style="font-size:24px;color:var(--gold)">' + money(me.money) + ' left</div><div class="small muted">Max bid ' + money(Math.max(0, me.maxBid)) + '</div></div>' : '') + '</div>' +
+
+    var people = a.managers.map(function (m, i) {
+      return '<div class="prow"><div class="pname"><strong>' + esc(m.name) + '</strong>' + (i === S.me ? ' <span class="muted small">you</span>' : '') + (m.online ? '' : ' <span class="small" style="color:var(--red)">offline</span>') +
+        '<div class="small muted">' + m.filled + '/12 signed</div></div><div class="pmoney">' + money(m.money) + '</div>' + statusChip(a, m, i) + '</div>';
+    }).join('');
+
+    app.innerHTML = '<div class="stack" style="gap:10px">' +
+      '<div class="abar"><div><div class="small muted">LOT ' + a.lotNo + ' OF ' + a.lotsTotal + '</div><div class="display" style="font-size:24px;line-height:1">' + esc(a.slotLabel.toUpperCase()) + '</div></div>' +
+      (me ? '<div style="text-align:right"><div class="display" style="font-size:22px;line-height:1;color:var(--gold)">' + money(me.money) + '</div><div class="small muted">max bid ' + money(Math.max(0, me.maxBid)) + '</div></div>' : '') + '</div>' +
       (me ? slotStrip(me.done, a.pos) : '') +
-      '<div class="small muted">This round: ' + a.round.map(function (x) { return '<span class="' + (x.st === 'past' ? 'strike' : '') + '"' + (x.st === 'now' ? ' style="color:var(--gold);font-weight:700"' : '') + '>' + esc(x.name) + ' <b>T' + x.tier + '</b></span>'; }).join(' · ') + '</div>' +
-      '<div class="row" style="justify-content:center;gap:14px">' +
-      '<div class="shield t' + Math.min(4, p.tier) + ' bigcard"><div class="ovr"><div class="display" style="font-size:42px;line-height:1">??</div><div class="display" style="font-size:18px">' + esc(a.pos) + '</div><span class="tag">' + esc(p.nation) + '</span><span class="tag" style="margin-top:2px">TIER ' + p.tier + '</span></div>' +
+      '<div class="ladder">' + ladder + '</div>' +
+      '<div style="text-align:center"><div class="tierflag ' + tierClass(p.tier, a.tiers) + '">' + tierLabel(p.tier, a.tiers) + '</div></div>' +
+      '<div class="shield ' + tierClass(p.tier, a.tiers) + ' bigcard"><div class="ovr"><div class="display" style="font-size:42px;line-height:1">??</div><div class="display" style="font-size:18px">' + esc(a.pos) + '</div><span class="tag">' + esc(p.nation) + '</span></div>' +
       '<img class="photo" alt="' + esc(p.name) + '" data-photo="' + esc(p.wiki) + '" style="visibility:hidden">' +
       '<div class="info"><div class="display" style="font-size:' + (p.name.length > 12 ? 22 : 28) + 'px;line-height:1">' + esc(p.name.toUpperCase()) + '</div>' +
-      '<div style="font-size:12px;font-weight:600">' + esc(p.club) + '</div><div style="font-size:11px;font-weight:700">' + esc(p.league) + '</div><div style="font-size:11px;font-weight:700">PRIME ' + esc(p.prime) + '</div></div></div>' +
-      '<div style="text-align:center;min-width:90px"><div id="timer" class="display" style="font-size:44px;line-height:1">' + clock(secs) + '</div><div class="small muted">time left</div>' +
-      '<div class="display" style="font-size:28px;margin-top:10px">' + (a.bid === null ? '—' : money(a.bid)) + '</div>' +
-      '<div class="chip" style="margin-top:4px;' + (a.leader === null ? 'background:#26304A;color:var(--muted)' : 'background:rgba(61,220,151,.15);color:var(--green)') + '">' + (a.leader === null ? 'No bids yet' : esc(a.managers[a.leader].name) + (lead ? ' (you)' : '')) + '</div></div></div>' +
-      controls + waitingLine(a) +
+      '<div style="font-size:12px;font-weight:600">' + esc(p.club) + '</div><div style="font-size:11px;font-weight:700">' + esc(p.league) + ' · PRIME ' + esc(p.prime) + '</div></div></div>' +
+      '<div class="bidrow"><div class="box"><div id="timer" class="display" style="font-size:34px;line-height:1">' + clock(secs) + '</div><div class="small muted">time left</div></div>' +
+      '<div class="box"><div class="small muted">CURRENT BID</div><div class="display" style="font-size:30px;line-height:1.05">' + (a.bid === null ? 'No bids' : money(a.bid)) + '</div>' +
+      '<div class="small" style="font-weight:700;color:' + (a.leader === null ? 'var(--muted)' : 'var(--green)') + '">' + (a.leader === null ? 'opens at ' + money(a.minBid) : esc(a.managers[a.leader].name) + (lead ? ' (you)' : '') + ' leads') + '</div></div></div>' +
+      controls +
       (a.log ? '<div class="toast">' + logLine(a.log) + '</div>' : '') +
-      '<div class="panel"><table><thead><tr><th>Manager</th><th>Money</th><th>Squad</th><th>This lot</th></tr></thead><tbody>' + others + '</tbody></table></div>' +
+      '<div class="panel plist">' + people + '</div>' +
       (S.role === 'host' ? '<div class="small muted" style="text-align:center">You\'re hosting: keep this tab open and your screen on.</div>' : '') +
       '</div>';
     tickTimer();
   }
 
   function cardHtml(c) {
-    return '<div style="text-align:center"><div class="shield mini t' + Math.min(4, c.tier) + '"><div class="display" style="font-size:28px;line-height:1">' + c.rating + '</div><div class="display" style="font-size:14px">' + c.pos + '</div></div>' +
+    return '<div style="text-align:center"><div class="shield mini ' + (c.last ? 'tlast' : 't' + Math.min(4, c.tier)) + '"><div class="display" style="font-size:28px;line-height:1">' + c.rating + '</div><div class="display" style="font-size:14px">' + c.pos + '</div></div>' +
       '<img class="avatar" alt="" data-photo="' + esc(c.wiki) + '" style="visibility:hidden">' +
       '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.name) + '</div><div class="small muted">' + money(c.price) + '</div>' +
       (c.chem === null ? '' : '<div class="small" style="color:var(--gold);letter-spacing:1px">' + diamonds(c.chem) + '</div>') + '</div>';
@@ -386,17 +417,30 @@
       pitch(r.cards) +
       '<div class="panel"><div class="row between"><span class="small muted" style="font-weight:700">TEAM CHEMISTRY</span><span class="display" style="font-size:22px;color:var(--gold)">' + r.chem + ' / 33</span></div>' +
       '<div style="height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px"><div style="height:100%;width:' + Math.round(r.chem / 33 * 100) + '%;background:var(--gold)"></div></div>' +
-      '<div class="small muted" style="margin-top:8px">Card colour = tier (gold is best). ◆ = chemistry points.</div></div>' +
+      '<div class="small muted" style="margin-top:8px">Card colour = tier: gold, silver, bronze, slate; dark red = lucky dip. ◆ = chemistry points.</div></div>' +
       (host ? '<button class="btn-gold" data-act="nextReveal">' + (last ? 'SEE THE VERDICT' : 'NEXT TEAM') + '</button>' : '<div class="panel small muted" style="text-align:center">The host controls the reveal.</div>') +
       '</div>';
   }
 
   function renderResults(v) {
-    var r = v.results, host = S.role === 'host';
+    var r = v.results, host = S.role === 'host', lg = r.league;
+    var names = {}; r.rows.forEach(function (x) { names[x.index] = x.name; });
+    var champ = lg.table[0];
     var medal = ['var(--gold)', '#C9CED9', '#D9A070'];
-    var rows = r.rows.map(function (x, i) {
-      return '<tr><td class="display" style="font-size:18px;color:' + (medal[i] || 'var(--muted)') + '">' + (i + 1) + '</td><td><strong>' + esc(x.name) + '</strong></td><td>' + x.quality + '</td><td>' + x.balance + '</td><td>' + x.chem + '</td><td class="display" style="font-size:18px;text-align:right">' + x.total + '</td></tr>';
+    var table = lg.table.map(function (t, i) {
+      var gd = t.gf - t.ga;
+      return '<tr' + (i === 0 ? ' style="background:rgba(232,199,102,.08)"' : '') + '><td class="display" style="font-size:18px;color:' + (medal[i] || 'var(--muted)') + '">' + (i + 1) + '</td><td><strong>' + esc(t.name) + '</strong></td><td>' + t.p + '</td><td>' + t.w + '</td><td>' + t.d + '</td><td>' + t.l + '</td><td>' + (gd > 0 ? '+' : '') + gd + '</td><td class="display" style="font-size:18px;text-align:right">' + t.pts + '</td></tr>';
     }).join('');
+    var rounds = '';
+    for (var rd = 1; rd <= lg.legs; rd++) {
+      rounds += '<div class="small muted" style="font-weight:700;margin-top:8px">ROUND ' + rd + '</div>' + lg.results.filter(function (m) { return m.round === rd; }).map(function (m) {
+        return '<div class="row between small" style="padding:3px 0"><span style="flex:1;text-align:right">' + esc(names[m.home]) + '</span><strong class="display" style="font-size:16px;min-width:48px;text-align:center">' + m.hg + ' – ' + m.ag + '</strong><span style="flex:1">' + esc(names[m.away]) + '</span></div>';
+      }).join('');
+    }
+    var ratings = r.rows.map(function (x) {
+      return '<tr><td><strong>' + esc(x.name) + '</strong></td><td>' + x.quality + '</td><td>' + x.balance + '</td><td>' + x.chem + '</td><td style="text-align:right"><strong>' + x.total + '</strong></td></tr>';
+    }).join('');
+    var by = r.by === 'ai' ? 'the AI pundit (Groq)' : r.by === 'chatgpt' ? 'ChatGPT' : 'the built-in formula';
     var verdicts = r.rows.filter(function (x) { return x.verdict; }).map(function (x) {
       return '<div class="panel"><div class="small" style="color:var(--gold);font-weight:700">PUNDIT ON ' + esc(x.name.toUpperCase()) + '</div><div style="margin:4px 0;line-height:1.4">' + esc(x.verdict) + '</div>' +
         (x.best ? '<div class="small muted">Best signing: <strong style="color:var(--ink)">' + esc(x.best) + '</strong></div>' : '') + (x.weak ? '<div class="small muted">Weak link: <strong style="color:var(--ink)">' + esc(x.weak) + '</strong></div>' : '') + '</div>';
@@ -405,12 +449,30 @@
     var squads = r.rows.map(function (x) {
       return '<details class="panel"><summary>' + esc(x.name) + ' · spent ' + money(x.spent) + '</summary><div style="margin-top:8px">' + pitch(r.squads[x.index]) + '</div></details>';
     }).join('');
+    var manual = '';
+    if (v.manual && host && H && H.prompt) {
+      manual = '<div class="panel stack" style="gap:8px;border-color:var(--gold)"><div class="small" style="color:var(--gold);font-weight:700;letter-spacing:.5px">GET THE PUNDIT\'S VERDICT FROM CHATGPT</div>' +
+        '<div class="small muted">1. Copy this and paste it into ChatGPT (or any AI chat).</div>' +
+        '<textarea id="promptText" readonly rows="5">' + esc(H.prompt.text) + '</textarea><button data-act="copyPrompt">Copy prompt</button>' +
+        '<div class="small muted">2. Paste ChatGPT\'s whole reply here. The league is then replayed with its ratings.</div>' +
+        '<textarea id="reply" rows="5" placeholder="{ &quot;teams&quot;: [ … ] }">' + esc(H.replyDraft || '') + '</textarea>' +
+        (H.manualError ? '<div class="warn">' + esc(H.manualError) + '</div>' : '') +
+        '<button class="btn-green" data-act="useReply" style="width:100%">USE THIS VERDICT</button></div>';
+    } else if (v.manual && !host) {
+      manual = '<div class="panel small muted">The host can get the pundit\'s verdict from ChatGPT. When they do, the league is replayed and this page updates.</div>';
+    }
     app.innerHTML = '<div class="stack">' +
-      '<div style="text-align:center"><div class="small" style="color:var(--gold);font-weight:700;letter-spacing:1.5px">FULL TIME</div><h1 class="display" style="font-size:32px">' + esc(r.headline || (r.rows[0].name.toUpperCase() + ' WIN')) + '</h1></div>' +
-      (v.judging ? '<div class="toast">The pundit is deliberating… (formula scores shown for now)</div>' : '') +
+      '<div style="text-align:center"><div class="small" style="color:var(--gold);font-weight:700;letter-spacing:1.5px">LEAGUE CHAMPIONS</div><h1 class="display" style="font-size:36px;color:var(--gold)">' + esc(champ.name.toUpperCase()) + '</h1>' +
+      (r.headline ? '<div style="margin-top:6px;font-weight:600">' + esc(r.headline) + '</div>' : '') + '</div>' +
+      (v.judging ? '<div class="toast">The pundit is rating the squads… the league will be replayed with their ratings.</div>' : '') +
       (v.judgeNote ? '<div class="warn">' + esc(v.judgeNote) + '</div>' : '') +
-      '<div class="panel"><table><thead><tr><th>#</th><th>Manager</th><th>Qual</th><th>Bal</th><th>Chem</th><th style="text-align:right">Total</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-      '<div class="small muted" style="margin-top:8px">Total = quality × 7 + balance × 2 + chemistry ÷ 33 × 10. Judged by ' + (r.by === 'ai' ? 'the AI pundit' : 'the built-in formula') + '.</div></div>' +
+      manual +
+      '<div class="panel"><div class="small muted" style="font-weight:700;margin-bottom:4px">FINAL TABLE · every team plays every other ' + (lg.legs === 4 ? 'four times' : 'home and away') + '</div>' +
+      '<table><thead><tr><th>#</th><th>Manager</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th style="text-align:right">Pts</th></tr></thead><tbody>' + table + '</tbody></table>' +
+      '<details><summary class="small">All results</summary>' + rounds + '</details></div>' +
+      '<div class="panel"><div class="small muted" style="font-weight:700;margin-bottom:4px">TEAM RATINGS · rated by ' + by + '</div>' +
+      '<table><thead><tr><th>Manager</th><th>Qual</th><th>Bal</th><th>Chem</th><th style="text-align:right">Strength</th></tr></thead><tbody>' + ratings + '</tbody></table>' +
+      '<div class="small muted" style="margin-top:6px">Strength = quality × 7 + balance × 2 + chemistry ÷ 33 × 10. Stronger teams score more often, but upsets happen.</div></div>' +
       '<div class="panel" style="border-color:var(--green);background:rgba(61,220,151,.07)"><div class="small" style="color:var(--green);font-weight:700">SMART BUSINESS AWARD</div><div style="margin-top:4px"><strong>' + esc(smartName ? smartName.name : '') + '</strong> · ' + esc(r.smart.reason) + '</div></div>' +
       verdicts + squads +
       '<details class="panel small" id="credits"><summary>Photo credits</summary><div id="creditList" class="muted">Loading…</div></details>' +
@@ -453,13 +515,22 @@
     else if (act === 'nextReveal') {
       if (H.reveal < H.g.managers.length - 1) { H.reveal++; hostBroadcast(); } else hostFinish();
       window.scrollTo(0, 0);
-    } else if (act === 'again') { H.g = null; H.screen = 'lobby'; H.result = null; H.lobby = H.lobby.filter(function (p) { return p.online; }); hostBroadcast(); }
+    } else if (act === 'again') { H.g = null; H.screen = 'lobby'; H.result = null; H.manual = false; H.replyDraft = ''; H.judgeNote = ''; H.lobby = H.lobby.filter(function (p) { return p.online; }); hostBroadcast(); }
+    else if (act === 'copyPrompt') {
+      var ta = document.getElementById('promptText');
+      var done = function () { b.textContent = 'Copied! Now paste it into ChatGPT'; };
+      if (navigator.clipboard) navigator.clipboard.writeText(H.prompt.text).then(done, function () { ta.focus(); ta.select(); b.textContent = 'Select all and copy'; });
+      else { ta.focus(); ta.select(); b.textContent = 'Select all and copy'; }
+      return;
+    }
+    else if (act === 'useReply') { hostPasteReply(document.getElementById('reply').value); return; }
     else if (act === 'copy') {
       var msg = "Join my Nand's Football Auction game: " + location.href.split('#')[0] + ' (room code ' + S.code + ')';
       if (navigator.clipboard) navigator.clipboard.writeText(msg).then(function () { b.textContent = 'Copied!'; }, function () { b.textContent = msg; });
       else b.textContent = msg;
     }
   });
+  app.addEventListener('input', function (ev) { if (ev.target.id === 'reply' && H) H.replyDraft = ev.target.value; });
   app.addEventListener('change', function (ev) {
     var t = ev.target; if (!H) return;
     if (t.id === 'budget') { H.settings.budget = Number(t.value); hostBroadcast(); }

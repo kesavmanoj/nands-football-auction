@@ -54,3 +54,24 @@ details summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
 .pline { display: flex; justify-content: center; gap: 4px; position: relative; }
 .pcell { width: 25%; max-width: 92px; }
 .pitch .muted { color: #CFE8DA; }
+.tlast { background: linear-gradient(160deg, #7A4B4B 0%, #3E2626 100%); color: #F7E3E3; }
+.abar { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+.ladder { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
+.ladder::-webkit-scrollbar { display: none; }
+.rung { flex: 1 0 auto; min-width: 84px; border-radius: 10px; padding: 6px 8px; line-height: 1.15; }
+.rung .rt { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 18px; }
+.rung .rn { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.rung .rs { font-size: 10px; font-weight: 600; opacity: .85; white-space: nowrap; }
+.rung.past { opacity: .4; }
+.rung.now { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
+.tierflag { display: inline-block; padding: 5px 16px; border-radius: 999px; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 1px; }
+.bidrow { display: grid; grid-template-columns: 112px 1fr; gap: 8px; }
+.bidrow .box { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+.bids button { line-height: 1.1; }
+.btn-pass { min-height: 52px; border: 1.5px solid var(--red); color: var(--red); background: transparent; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 1px; padding: 0 20px; }
+.plist { padding: 4px 12px; }
+.prow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.prow:first-child { border-top: 0; }
+.pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pmoney { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; }
+textarea { width: 100%; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 12px/1.4 ui-monospace, monospace; padding: 10px; resize: vertical; }
