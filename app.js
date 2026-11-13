@@ -81,16 +81,30 @@
   }
 
   function hostAction(idx, msg, now) {
+    if (msg.t === 'vote') {
+      if (H.screen === 'lobby' && H.lobby[idx] && E.FORMATIONS[msg.f]) { H.lobby[idx].vote = msg.f; hostBroadcast(); }
+      return;
+    }
     if (!H.g || H.screen !== 'auction') return;
     if (msg.t === 'bid') E.bid(H.g, idx, Number(msg.inc) || 1, now);
     else if (msg.t === 'pass') E.pass(H.g, idx, now);
     afterEngine();
   }
 
+  // Formation vote: most votes wins; a tie goes to the host's pick if it's among the tied ones, otherwise random.
+  function voteResult(lobby) {
+    var counts = {}; lobby.forEach(function (p) { if (p.vote) counts[p.vote] = (counts[p.vote] || 0) + 1; });
+    var best = 0; for (var f in counts) best = Math.max(best, counts[f]);
+    var tied = Object.keys(counts).filter(function (f) { return counts[f] === best; });
+    return { counts: counts, tied: tied, leader: tied.length === 1 ? tied[0] : (tied.indexOf(lobby[0].vote) >= 0 ? lobby[0].vote : null) };
+  }
+
   function hostStart() {
     if (H.lobby.length < 2) return;
     var names = H.lobby.map(function (p) { return p.name; });
-    H.g = E.createGame({ names: names, budget: H.settings.budget, timerSec: H.settings.timer, db: DB, easter: H.lobby[0].name.trim().toLowerCase() === 'goonpan' });
+    var vr = voteResult(H.lobby);
+    var f = vr.leader || (vr.tied.length ? vr.tied[Math.floor(Math.random() * vr.tied.length)] : '442');
+    H.g = E.createGame({ names: names, budget: H.settings.budget, timerSec: H.settings.timer, db: DB, formation: f, easter: H.lobby[0].name.trim().toLowerCase() === 'goonpan' });
     E.start(H.g, Date.now());
     H.screen = 'auction'; H.reveal = 0; H.result = null; H.judging = false; H.judgeNote = '';
     hostBroadcast();
@@ -103,10 +117,10 @@
 
   function cardsOf(m, chemPer) {
     var out = [];
-    E.SLOT_TYPES.forEach(function (s) {
-      m.squad[s.pos].forEach(function (e) {
+    H.g.slots.forEach(function (s) {
+      m.squad[s.pos].forEach(function (e, k) {
         var p = e.player;
-        out.push({ pos: s.pos, name: p.name, club: p.club, nation: p.nation, league: p.league, prime: p.prime, rating: p.rating, tier: e.tier, last: e.tier === H.g.managers.length && H.g.managers.length > 1, price: e.price, mv: p.mv, mvEst: p.mvEst, wiki: p.wiki,
+        out.push({ pos: s.pos, k: k, label: E.posLabel(H.g.formation, s.pos, k), name: p.name, club: p.club, nation: p.nation, league: p.league, prime: p.prime, rating: p.rating, tier: e.tier, last: e.tier === H.g.managers.length && H.g.managers.length > 1, price: e.price, mv: p.mv, mvEst: p.mvEst, wiki: p.wiki,
           chem: s.pos === 'MGR' ? null : (chemPer[p.id] || 0) });
       });
     });
@@ -144,7 +158,8 @@
     H.result = { rows: sc.rows.map(function (r) { return { index: r.index, name: r.name, quality: r.quality, balance: r.balance, chem: r.chem, total: r.total, spent: r.spent, verdict: '', best: '', weak: '' }; }),
       smart: { index: sc.smartBusiness.index, reason: 'Most quality per dollar spent.' }, headline: '', by: 'formula', squads: squads };
     H.leagueSeed = Math.floor(Math.random() * 1e9);
-    H.prompt = Judge.buildPrompt(H.g.managers.map(function (m, i) { return { index: i, chem: E.chemistry(m).total, cards: squads[i] }; }));
+    H.prompt = Judge.buildPrompt(H.g.managers.map(function (m, i) { return { index: i, chem: E.chemistry(m).total, cards: squads[i] }; }),
+      { name: E.formation(H.g.formation).name, slots: squads[0].filter(function (c) { return c.pos !== 'MGR'; }).map(function (c) { return c.label; }).join(', ') });
     H.manualError = '';
     playLeague();
     H.screen = 'results';
@@ -167,13 +182,13 @@
 
   // What everyone is allowed to see. Ratings and tiers are never included until the reveal.
   function buildView() {
-    var v = { screen: H.screen, code: S.code, settings: H.settings, lobby: H.lobby.map(function (p) { return { name: p.name, online: p.online }; }), hasKey: !!judgeKey() };
+    var v = { screen: H.screen, code: S.code, settings: H.settings, lobby: H.lobby.map(function (p) { return { name: p.name, online: p.online, vote: p.vote || null }; }), formation: H.g ? H.g.formation : null, hasKey: !!judgeKey() };
     var g = H.g;
     if (H.screen === 'auction' && g && g.phase === 'bidding') {
-      var l = E.lot(g), c = g.current, st = E.slotType(l.pos);
+      var l = E.lot(g), c = g.current, st = E.slotType(l.pos, g);
       v.auction = {
         lotNo: g.lotIndex + 1, lotsTotal: g.lots.length, slotLabel: st.label, pos: l.pos, minBid: l.open,
-        easter: !!l.easter,
+        easter: !!l.easter, formation: g.formation, slots: g.slots.map(function (s) { return { pos: s.pos, count: s.count }; }),
         player: { name: l.player.name, tier: l.tier, photo: l.player.photo || null, club: l.player.club, league: l.player.league, nation: l.player.nation, prime: l.player.prime, wiki: l.player.wiki },
         tiers: g.managers.length,
         round: g.lots.map(function (x, i) {
@@ -182,7 +197,7 @@
         }).filter(function (x) { return x.pos === l.pos; }),
         bid: c.bid, leader: c.leader, remainingMs: Math.max(0, c.endsAt - Date.now()), passed: Object.keys(c.passed).map(Number),
         managers: g.managers.map(function (m, i) {
-          var done = {}; E.SLOT_TYPES.forEach(function (s) { done[s.pos] = m.squad[s.pos].length; });
+          var done = {}; g.slots.forEach(function (s) { done[s.pos] = m.squad[s.pos].length; });
           return { name: m.name, online: H.lobby[i] ? H.lobby[i].online : false, money: m.money, filled: E.filled(m), maxBid: E.maxBid(g, m), needs: E.needs(m, l.pos), done: done };
         }),
         log: g.log[0] || null
@@ -190,10 +205,10 @@
     }
     if (H.screen === 'reveal' && g) {
       var m = g.managers[H.reveal], chem = E.chemistry(m);
-      v.reveal = { index: H.reveal, of: g.managers.length, name: m.name, chem: chem.total, cards: cardsOf(m, chem.per) };
+      v.reveal = { formation: g.formation, index: H.reveal, of: g.managers.length, name: m.name, chem: chem.total, cards: cardsOf(m, chem.per) };
     }
     if (H.screen === 'results' && H.result) {
-      v.results = { rows: H.result.rows, smart: H.result.smart, headline: H.result.headline, by: H.result.by, squads: H.result.squads, league: H.result.league };
+      v.results = { formation: H.g.formation, rows: H.result.rows, smart: H.result.smart, headline: H.result.headline, by: H.result.by, squads: H.result.squads, league: H.result.league };
       v.judging = H.judging; v.judgeNote = H.judgeNote; v.manual = !!H.manual;
     }
     return v;
@@ -278,7 +293,7 @@
   function renderHome() {
     var busy = S.connecting;
     app.innerHTML = '<div class="stack">' + header() +
-      '<div class="small muted" style="text-align:center">Bid with friends to build the best 4-4-2. Ratings stay hidden until every squad is complete.</div>' +
+      '<div class="small muted" style="text-align:center">Bid with friends to build the best XI. Ratings stay hidden until every squad is complete.</div>' +
       '<div class="panel stack"><div><label for="name">YOUR NAME</label><input id="name" maxlength="16" placeholder="e.g. Dev" value="' + esc(S.myName) + '"></div></div>' +
       '<div class="panel stack"><div><label for="code">ROOM CODE</label><input id="code" class="code" maxlength="5" placeholder="KX7QP" value="' + esc(S.code) + '"></div>' +
       '<button class="btn-gold" data-act="join"' + (busy ? ' disabled' : '') + '>' + (busy ? 'CONNECTING…' : 'JOIN ROOM') + '</button></div>' +
@@ -316,6 +331,7 @@
       (host ? '<button data-act="copy">Copy invite message</button>' : '') +
       '<div class="row between"><div class="display" style="font-size:20px">MANAGERS</div><div class="small muted">' + v.lobby.length + ' of 8</div></div>' +
       '<div class="stack" style="gap:8px">' + people + '</div>' +
+      formationVote(v) +
       '<div class="panel stack" style="gap:10px">' + settings + '</div>' +
       (host
         ? '<div class="small muted">Keep this tab open and your screen on: the game runs on your device.</div><button class="btn-gold" data-act="start"' + (v.lobby.length < 2 ? ' disabled' : '') + '>' + (v.lobby.length < 2 ? 'WAITING FOR FRIENDS…' : 'START AUCTION') + '</button>'
@@ -323,10 +339,24 @@
       '</div>';
   }
 
-  function slotStrip(done, nowPos) {
+  function formationVote(v) {
+    var counts = {}, mine = v.lobby[S.me] && v.lobby[S.me].vote;
+    v.lobby.forEach(function (p) { if (p.vote) counts[p.vote] = (counts[p.vote] || 0) + 1; });
+    var best = 0; for (var f in counts) best = Math.max(best, counts[f]);
+    var btns = ['442', '433', '451', '343'].map(function (f) {
+      var n = counts[f] || 0, lead = n > 0 && n === best;
+      var who = v.lobby.filter(function (p) { return p.vote === f; }).map(function (p) { return esc(p.name); }).join(', ');
+      return '<button data-act="vote" data-f="' + f + '" class="fvote' + (mine === f ? ' mine' : '') + (lead ? ' lead' : '') + '"><span class="display" style="font-size:22px">' + E.FORMATIONS[f].name + '</span>' +
+        '<span class="small">' + n + ' vote' + (n === 1 ? '' : 's') + '</span><span class="small muted fwho">' + (who || '&nbsp;') + '</span></button>';
+    }).join('');
+    return '<div class="panel stack" style="gap:8px"><div class="row between"><div class="display" style="font-size:20px">FORMATION VOTE</div><div class="small muted">tap to vote</div></div>' +
+      '<div class="fgrid">' + btns + '</div><div class="small muted">Most votes wins when the host starts. A tie goes to the host\'s pick; no votes means 4-4-2.</div></div>';
+  }
+
+  function slotStrip(done, nowPos, slots, f) {
     var out = '';
-    E.SLOT_TYPES.forEach(function (s) {
-      for (var k = 0; k < s.count; k++) out += '<div class="' + (k < done[s.pos] ? 'done' : s.pos === nowPos ? 'now' : '') + '">' + s.pos + '</div>';
+    slots.forEach(function (s) {
+      for (var k = 0; k < s.count; k++) out += '<div class="' + (k < done[s.pos] ? 'done' : s.pos === nowPos ? 'now' : '') + '">' + E.posLabel(f, s.pos, k) + '</div>';
     });
     return '<div class="slots">' + out + '</div>';
   }
@@ -377,9 +407,9 @@
     }).join('');
 
     app.innerHTML = '<div class="stack" style="gap:10px">' +
-      '<div class="abar"><div><div class="small muted">LOT ' + a.lotNo + ' OF ' + a.lotsTotal + '</div><div class="display" style="font-size:24px;line-height:1">' + esc(a.slotLabel.toUpperCase()) + '</div></div>' +
+      '<div class="abar"><div><div class="small muted">' + E.formation(a.formation).name + ' · LOT ' + a.lotNo + ' OF ' + a.lotsTotal + '</div><div class="display" style="font-size:24px;line-height:1">' + esc(a.slotLabel.toUpperCase()) + '</div></div>' +
       (me ? '<div style="text-align:right"><div class="display" style="font-size:22px;line-height:1;color:var(--gold)">' + money(me.money) + '</div><div class="small muted">max bid ' + money(Math.max(0, me.maxBid)) + '</div></div>' : '') + '</div>' +
-      (me ? slotStrip(me.done, a.pos) : '') +
+      (me ? slotStrip(me.done, a.pos, a.slots, a.formation) : '') +
       '<div class="ladder">' + ladder + '</div>' +
       '<div style="text-align:center"><div class="tierflag ' + tierClass(p.tier, a.tiers) + '">' + tierLabel(p.tier, a.tiers) + '</div></div>' +
       '<div class="shield ' + tierClass(p.tier, a.tiers) + ' bigcard"><div class="ovr"><div class="display" style="font-size:42px;line-height:1">??</div><div class="display" style="font-size:18px">' + esc(a.pos) + '</div><span class="tag">' + esc(p.nation) + '</span></div>' +
@@ -398,7 +428,7 @@
   }
 
   function cardHtml(c) {
-    return '<div style="text-align:center"><div class="shield mini ' + (c.last ? 'tlast' : 't' + Math.min(4, c.tier)) + '"><div class="display" style="font-size:28px;line-height:1">' + c.rating + '</div><div class="display" style="font-size:14px">' + c.pos + '</div></div>' +
+    return '<div style="text-align:center"><div class="shield mini ' + (c.last ? 'tlast' : 't' + Math.min(4, c.tier)) + '"><div class="display" style="font-size:28px;line-height:1">' + c.rating + '</div><div class="display" style="font-size:14px">' + (c.label || c.pos) + '</div></div>' +
       '<img class="avatar" alt="" data-photo="' + esc(c.wiki) + '" style="visibility:hidden">' +
       '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.name) + '</div>' +
       '<div class="paid">paid ' + money(c.price) + '</div>' + (c.mv ? '<div class="worth">worth €' + c.mv + 'M' + (c.mvEst ? '*' : '') + '</div>' : '') +
@@ -418,16 +448,17 @@
   }
 
   // Squad drawn as a 4-4-2 on a pitch, manager underneath.
-  function pitch(cards) {
+  function pitch(cards, f) {
     var by = {}; cards.forEach(function (c) { (by[c.pos] = by[c.pos] || []).push(c); });
     var get = function (pos, k) { return (by[pos] || [])[k || 0]; };
-    var line = function (list) { return '<div class="pline">' + list.filter(Boolean).map(function (c) { return '<div class="pcell">' + cardHtml(c) + '</div>'; }).join('') + '</div>'; };
+    var line = function (list) {
+      list = list.filter(Boolean);
+      var w = Math.floor(100 / Math.max(4, list.length));
+      return '<div class="pline">' + list.map(function (c) { return '<div class="pcell" style="width:' + w + '%">' + cardHtml(c) + '</div>'; }).join('') + '</div>';
+    };
     var mgr = get('MGR');
-    return '<div class="pitch">' +
-      line([get('ST', 0), get('ST', 1)]) +
-      line([get('LM'), get('CM', 0), get('CM', 1), get('RM')]) +
-      line([get('LB'), get('CB', 0), get('CB', 1), get('RB')]) +
-      line([get('GK')]) + '</div>' +
+    return '<div class="small muted" style="text-align:center;font-weight:700;margin-bottom:6px">' + E.formation(f).name + '</div><div class="pitch">' +
+      E.formation(f).layout.map(function (row) { return line(row.map(function (x) { return get(x[0], x[1]); })); }).join('') + '</div>' +
       (mgr ? '<div class="row" style="gap:12px;justify-content:center;margin-top:8px"><div style="width:80px">' + cardHtml(mgr) + '</div><div class="small muted">Manager</div></div>' : '');
   }
 
@@ -435,7 +466,7 @@
     var r = v.reveal, host = S.role === 'host', last = r.index === r.of - 1;
     app.innerHTML = '<div class="stack">' +
       '<div style="text-align:center"><div class="small" style="color:var(--gold);font-weight:700;letter-spacing:1.5px">THE REVEAL · TEAM ' + (r.index + 1) + ' OF ' + r.of + '</div><h1 class="display" style="font-size:36px">' + esc(r.name.toUpperCase()) + '</h1></div>' +
-      pitch(r.cards) +
+      pitch(r.cards, r.formation) +
       '<div class="panel"><div class="row between"><span class="small muted" style="font-weight:700">TEAM CHEMISTRY</span><span class="display" style="font-size:22px;color:var(--gold)">' + r.chem + ' / 33</span></div>' +
       '<div style="height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px"><div style="height:100%;width:' + Math.round(r.chem / 33 * 100) + '%;background:var(--gold)"></div></div>' +
       '<div class="small muted" style="margin-top:8px">Card colour = tier: gold, silver, bronze, slate; dark red = lucky dip. ◆ = chemistry points.</div></div>' +
@@ -470,7 +501,7 @@
     var smartName = r.rows.filter(function (x) { return x.index === r.smart.index; })[0];
     var squads = r.rows.map(function (x) {
       var tm = teamMoney(r.squads[x.index]);
-      return '<details class="panel"><summary>' + esc(x.name) + ' · paid ' + money(tm.paid) + ' · worth €' + tm.worth + 'M</summary><div style="margin-top:8px">' + pitch(r.squads[x.index]) + moneyLine(r.squads[x.index]) + '</div></details>';
+      return '<details class="panel"><summary>' + esc(x.name) + ' · paid ' + money(tm.paid) + ' · worth €' + tm.worth + 'M</summary><div style="margin-top:8px">' + pitch(r.squads[x.index], r.formation) + moneyLine(r.squads[x.index]) + '</div></details>';
     }).join('');
     var manual = '';
     if (v.manual && host && H && H.prompt) {
@@ -535,6 +566,7 @@
       else { if (code.length !== 5) { S.error = 'Room codes are 5 characters.'; render(); return; } guestJoin(code, name.slice(0, 16)); }
     } else if (act === 'rejoin') { guestJoin(S.code, S.myName); }
     else if (act === 'start') { hostStart(); }
+    else if (act === 'vote') { send({ t: 'vote', f: b.getAttribute('data-f') }); }
     else if (act === 'bid') { send({ t: 'bid', inc: Number(b.getAttribute('data-inc')) }); }
     else if (act === 'pass') { send({ t: 'pass' }); }
     else if (act === 'nextReveal') {

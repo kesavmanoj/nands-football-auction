@@ -56,12 +56,12 @@ details summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
 .pitch .muted { color: #CFE8DA; }
 .tlast { background: linear-gradient(160deg, #7A4B4B 0%, #3E2626 100%); color: #F7E3E3; }
 .abar { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
-.ladder { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
+.ladder { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; padding: 2px; }
 .ladder::-webkit-scrollbar { display: none; }
-.rung { flex: 1 0 auto; min-width: 84px; border-radius: 10px; padding: 6px 8px; line-height: 1.15; }
+.rung { min-width: 0; border-radius: 10px; padding: 6px 8px; line-height: 1.15; }
 .rung .rt { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 18px; }
-.rung .rn { font-size: 12px; font-weight: 700; white-space: nowrap; }
-.rung .rs { font-size: 10px; font-weight: 600; opacity: .85; white-space: nowrap; }
+.rung .rn { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rung .rs { font-size: 10px; font-weight: 600; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rung.past { opacity: .4; }
 .rung.now { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
 .tierflag { display: inline-block; padding: 5px 16px; border-radius: 999px; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 1px; }
@@ -81,3 +81,10 @@ textarea { width: 100%; border-radius: 12px; border: 1px solid var(--line); back
 .pitch .worth { color: #9FF0C8; }
 .site-footer { max-width: 480px; margin: 0 auto; padding: 18px 14px 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: center; line-height: 1.6; }
 .site-footer a { color: var(--gold); word-break: break-all; }
+.fgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fvote { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; min-height: 76px; text-align: left; }
+.fvote.lead { border-color: var(--gold); }
+.fvote.mine { background: rgba(232,199,102,.14); border: 2px solid var(--gold); color: var(--gold); }
+.fwho { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.slots { flex-wrap: wrap; }
+.slots div { min-width: 26px; }

@@ -1,17 +1,30 @@
 // Nand's Football Auction — game engine (rules only, no UI).
 // Pure logic so the same file can later run on the server as the bid referee.
 (function (root) {
-  var SLOT_TYPES = [
-    { pos: 'GK', count: 1, label: 'Goalkeeper' },
-    { pos: 'RB', count: 1, label: 'Right back' },
-    { pos: 'CB', count: 2, label: 'Centre back' },
-    { pos: 'LB', count: 1, label: 'Left back' },
-    { pos: 'RM', count: 1, label: 'Right midfield' },
-    { pos: 'CM', count: 2, label: 'Central midfield' },
-    { pos: 'LM', count: 1, label: 'Left midfield' },
-    { pos: 'ST', count: 2, label: 'Striker' },
-    { pos: 'MGR', count: 1, label: 'Manager' }
-  ];
+  var POS_NAMES = { GK: 'Goalkeeper', RB: 'Right back', CB: 'Centre back', LB: 'Left back', RM: 'Right midfield',
+    CM: 'Central midfield', LM: 'Left midfield', ST: 'Striker', MGR: 'Manager' };
+  // Each formation: how many of each position, display labels (e.g. RM plays as RW in a 4-3-3),
+  // and the pitch layout from the front line back ([position, which one]).
+  var FORMATIONS = {
+    '442': { name: '4-4-2', slots: [['GK', 1], ['RB', 1], ['CB', 2], ['LB', 1], ['RM', 1], ['CM', 2], ['LM', 1], ['ST', 2], ['MGR', 1]],
+      layout: [[['ST', 0], ['ST', 1]], [['LM', 0], ['CM', 0], ['CM', 1], ['RM', 0]], [['LB', 0], ['CB', 0], ['CB', 1], ['RB', 0]], [['GK', 0]]] },
+    '433': { name: '4-3-3', slots: [['GK', 1], ['RB', 1], ['CB', 2], ['LB', 1], ['CM', 3], ['RM', 1], ['LM', 1], ['ST', 1], ['MGR', 1]],
+      labels: { RM: ['RW'], LM: ['LW'] }, rounds: { RM: 'Right wing', LM: 'Left wing' },
+      layout: [[['LM', 0], ['ST', 0], ['RM', 0]], [['CM', 0], ['CM', 1], ['CM', 2]], [['LB', 0], ['CB', 0], ['CB', 1], ['RB', 0]], [['GK', 0]]] },
+    '451': { name: '4-5-1', slots: [['GK', 1], ['RB', 1], ['CB', 2], ['LB', 1], ['RM', 1], ['CM', 3], ['LM', 1], ['ST', 1], ['MGR', 1]],
+      layout: [[['ST', 0]], [['LM', 0], ['CM', 0], ['CM', 1], ['CM', 2], ['RM', 0]], [['LB', 0], ['CB', 0], ['CB', 1], ['RB', 0]], [['GK', 0]]] },
+    '343': { name: '3-4-3', slots: [['GK', 1], ['CB', 3], ['RM', 2], ['CM', 2], ['LM', 2], ['ST', 1], ['MGR', 1]],
+      labels: { RM: ['RM', 'RW'], LM: ['LM', 'LW'] }, rounds: { RM: 'Right midfield & right wing', LM: 'Left midfield & left wing' },
+      layout: [[['LM', 1], ['ST', 0], ['RM', 1]], [['LM', 0], ['CM', 0], ['CM', 1], ['RM', 0]], [['CB', 0], ['CB', 1], ['CB', 2]], [['GK', 0]]] }
+  };
+  function formation(f) { return FORMATIONS[f] || FORMATIONS['442']; }
+  function slotsFor(f) {
+    var F = formation(f);
+    return F.slots.map(function (x) { return { pos: x[0], count: x[1], label: (F.rounds && F.rounds[x[0]]) || POS_NAMES[x[0]] }; });
+  }
+  // Short label for the k-th player at a position in this formation, e.g. 'RW' for RM in a 4-3-3.
+  function posLabel(f, pos, k) { var l = formation(f).labels && formation(f).labels[pos]; return l ? (l[k] || l[l.length - 1]) : pos; }
+  var SLOT_TYPES = slotsFor('442');
   var TOTAL_SLOTS = 12;
   var RESET_MS = 5000;
 
@@ -20,7 +33,7 @@
     for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
     return a;
   }
-  function slotType(pos) { for (var i = 0; i < SLOT_TYPES.length; i++) if (SLOT_TYPES[i].pos === pos) return SLOT_TYPES[i]; }
+  function slotType(pos, g) { var list = g ? g.slots : SLOT_TYPES; for (var i = 0; i < list.length; i++) if (list[i].pos === pos) return list[i]; }
 
   var LAST_TIER_BELOW = 86;   // players rated under this are only ever used for the last tier
   var DECENT_FROM = 80;       // last-tier players rated 80-85 are "decent"; under 80 are flops
@@ -28,15 +41,23 @@
 
   // For each slot: the good players (86+) are ranked and split into tiers 1 to n - 1 (tier 1 = best).
   // The last tier is a lucky dip: usually a flop, sometimes a decent player. `count` players per tier.
-  function buildLots(db, n, rng) {
+  function buildLots(db, n, rng, slots) {
     var lots = [];
-    SLOT_TYPES.forEach(function (st) {
+    slots.forEach(function (st) {
       var all = db.filter(function (p) { return p.pos === st.pos; }).sort(function (a, b) { return b.rating - a.rating; });
       var good = all.filter(function (p) { return p.rating >= LAST_TIER_BELOW; });
       var low = all.filter(function (p) { return p.rating < LAST_TIER_BELOW; });
       if (low.length < st.count) throw new Error('Not enough last-tier ' + st.label + ' players');
       var bands = n - 1, band = Math.floor(good.length / bands);
-      if (band < st.count) throw new Error('Not enough ' + st.label + ' players for ' + n + ' managers');
+      if (band < st.count) {
+        // Not enough top players for random picks (e.g. 3 centre backs with 8 managers): take the best in order,
+        // topping up with the best decent players, and keep those out of the lucky dip.
+        var topUp = low.filter(function (p) { return p.rating >= DECENT_FROM; });
+        good = good.concat(topUp).slice(0, bands * st.count);
+        low = low.filter(function (p) { return good.indexOf(p) < 0; });
+        band = st.count;
+      }
+      if (good.length < bands * st.count || low.length < st.count) throw new Error('Not enough ' + st.label + ' players for ' + n + ' managers');
       var slotLots = [];
       for (var t = 0; t < bands; t++) {
         var picks = shuffle(good.slice(t * band, (t + 1) * band), rng).slice(0, st.count);
@@ -58,15 +79,18 @@
   function createGame(opts) {
     var rng = opts.rng || Math.random;
     var budget = opts.budget || 700;
+    var slots = slotsFor(opts.formation);
     var g = {
+      formation: formation(opts.formation) === FORMATIONS[opts.formation] ? opts.formation : '442',
+      slots: slots,
       budget: budget,
       minBid: Math.max(1, Math.round(budget / 140)),
       timerMs: (opts.timerSec || 180) * 1000,
       managers: opts.names.map(function (name) {
-        var squad = {}; SLOT_TYPES.forEach(function (s) { squad[s.pos] = []; });
-        return { name: name, money: budget, squad: squad };
+        var squad = {}, need = {}; slots.forEach(function (s) { squad[s.pos] = []; need[s.pos] = s.count; });
+        return { name: name, money: budget, squad: squad, need: need };
       }),
-      lots: buildLots(opts.db, opts.names.length, rng),
+      lots: buildLots(opts.db, opts.names.length, rng, slots),
       lotIndex: -1,
       phase: 'ready',
       current: null,
@@ -86,7 +110,7 @@
   }
 
   function filled(m) { var c = 0; for (var k in m.squad) c += m.squad[k].length; return c; }
-  function needs(m, pos) { return m.squad[pos].length < slotType(pos).count; }
+  function needs(m, pos) { return !!m.squad[pos] && m.squad[pos].length < m.need[pos]; }
   function maxBid(g, m) { return m.money - g.minBid * (TOTAL_SLOTS - filled(m) - 1); }
   function lot(g) { return g.lots[g.lotIndex]; }
   function needers(g) { var l = lot(g); return g.managers.map(function (m, i) { return i; }).filter(function (i) { return needs(g.managers[i], l.pos); }); }
@@ -179,7 +203,7 @@
 
   function chemistry(m) {
     var players = [];
-    SLOT_TYPES.forEach(function (s) { if (s.pos !== 'MGR') m.squad[s.pos].forEach(function (e) { players.push(e.player); }); });
+    for (var k in m.squad) if (k !== 'MGR') m.squad[k].forEach(function (e) { players.push(e.player); });
     var mgr = m.squad.MGR[0] && m.squad.MGR[0].player;
     var club = {}, nation = {}, league = {};
     players.forEach(function (p) { club[p.club] = (club[p.club] || 0) + 1; nation[p.nation] = (nation[p.nation] || 0) + 1; league[p.league] = (league[p.league] || 0) + 1; });
@@ -250,7 +274,7 @@
     return { table: table, results: results, legs: legs };
   }
 
-  var api = { league: league, SLOT_TYPES: SLOT_TYPES, TOTAL_SLOTS: TOTAL_SLOTS, createGame: createGame, start: start, bid: bid, pass: pass, tick: tick,
+  var api = { league: league, FORMATIONS: FORMATIONS, formation: formation, slotsFor: slotsFor, posLabel: posLabel, SLOT_TYPES: SLOT_TYPES, TOTAL_SLOTS: TOTAL_SLOTS, createGame: createGame, start: start, bid: bid, pass: pass, tick: tick,
     canBid: canBid, nextAmount: nextAmount, maxBid: maxBid, needs: needs, filled: filled, lot: lot, chemistry: chemistry, score: score, slotType: slotType };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Engine = api;
 })(this);

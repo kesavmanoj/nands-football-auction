@@ -6,8 +6,8 @@ window.Judge = (function () {
   var MODEL = 'openai/gpt-oss-120b';
   var LETTERS = 'ABCDEFGH';
   var SYSTEM = [
-    'You are the judge of "Nand\'s Football Auction", a game where friends bid with equal budgets to build a 4-4-2 starting XI plus a manager. Each round only offered players of that position, so every player is in his natural position.',
-    'You will receive teams labelled Team A, Team B, etc. Each lists 11 players by slot (GK, RB, CB, CB, LB, RM, CM, CM, LM, ST, ST) and a manager. Each entry includes prime club, nation, league, prime years, a reference rating out of 100 from the game\'s database, and the price paid in millions of dollars. Each team also shows its chemistry score out of 33, calculated by the game; do not score chemistry yourself.',
+    'You are the judge of "Nand\'s Football Auction", a game where friends bid with equal budgets to build a starting XI plus a manager in the {FORMATION} formation. Each round only offered players of that position, so every player is in his natural position.',
+    'You will receive teams labelled Team A, Team B, etc. Each lists 11 players by slot ({SLOTS}) and a manager. Each entry includes prime club, nation, league, prime years, a reference rating out of 100 from the game\'s database, and the price paid in millions of dollars. Each team also shows its chemistry score out of 33, calculated by the game; do not score chemistry yourself.',
     'Your scores set each team\'s strength (quality x 7 + balance x 2 + chemistry / 33 x 10). The game then plays a full home-and-away league between the teams using those strengths, and the league champion wins.',
     'Score every team from 0 to 10, to one decimal place, on:',
     '1. Squad quality: the ability of the 11 players and the manager at their prime, whatever their era. Compare players across eras fairly. Use the reference rating as a guide; adjust only where your football knowledge strongly disagrees.',
@@ -28,15 +28,17 @@ window.Judge = (function () {
 
   // teams: [{ index, chem, cards: [{pos, name, club, nation, league, prime, rating, price}] }]
   // Returns { order: [team index per letter], system, user, text } — `text` is the copy-and-paste version.
-  function buildPrompt(teams) {
+  function buildPrompt(teams, form) {
+    form = form || { name: '4-4-2', slots: 'GK, RB, CB, CB, LB, RM, CM, CM, LM, ST, ST' };
+    var system = SYSTEM.replace('{FORMATION}', form.name).replace('{SLOTS}', form.slots);
     var order = shuffle(teams);
     var user = order.map(function (t, i) {
       return 'Team ' + LETTERS[i] + ' (chemistry ' + t.chem + '/33):\n' + t.cards.map(function (c) {
-        return c.pos + ': ' + c.name + ' (' + c.club + ', ' + c.nation + ', ' + c.league + ', prime ' + c.prime + ', rating ' + c.rating + ', paid $' + c.price + 'M)';
+        return (c.label || c.pos) + ': ' + c.name + ' (' + c.club + ', ' + c.nation + ', ' + c.league + ', prime ' + c.prime + ', rating ' + c.rating + ', paid $' + c.price + 'M)';
       }).join('\n');
     }).join('\n\n');
     var copyNote = '\n\nPut the JSON in a single ```json code block and write nothing else, so it can be copied with one click.';
-    return { order: order.map(function (t) { return t.index; }), system: SYSTEM, user: user, text: SYSTEM + '\n\n' + user + copyNote };
+    return { order: order.map(function (t) { return t.index; }), system: system, user: user, text: system + '\n\n' + user + copyNote };
   }
 
   function letterOf(x) { return LETTERS.indexOf(String(x || '').replace(/team\s*/i, '').trim().charAt(0).toUpperCase()); }
