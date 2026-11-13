@@ -17,9 +17,11 @@
   function clock(secs) { return secs >= 60 ? Math.floor(secs / 60) + ':' + ('0' + (secs % 60)).slice(-2) : String(secs); }
   function diamonds(n) { return '◆◆◆'.slice(0, n) + '◇◇◇'.slice(0, 3 - n); }
   function newCode() { var a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = ''; for (var i = 0; i < 5; i++) s += a[Math.floor(Math.random() * a.length)]; return s; }
-  function siteKey() { return (window.NFA_CONFIG && window.NFA_CONFIG.defaultKey) || ''; }
-  // The key used for judging: the host's own key if entered, otherwise the site's built-in one.
+  function siteKey() { return (window.NFA_CONFIG && window.NFA_CONFIG.punditProxy) || ''; }
+  // Judging: the host's own key if entered, otherwise the site's built-in pundit (proxy), otherwise ChatGPT copy-paste.
   function judgeKey() { return (H && H.key) || siteKey(); }
+  function judgeName() { return H && H.key ? Judge.provider(H.key) : 'built-in DeepSeek'; }
+  function judgeRun(prompt) { return H && H.key ? Judge.run(H.key, prompt) : Judge.runProxy(siteKey(), prompt); }
   function getKey() { try { return localStorage.getItem('nfa-groq-key') || ''; } catch (e) { return ''; } }
   function setKey(k, remember) { try { if (remember && k) localStorage.setItem('nfa-groq-key', k); else localStorage.removeItem('nfa-groq-key'); } catch (e) {} }
 
@@ -148,8 +150,8 @@
     H.screen = 'results';
     if (judgeKey()) {
       H.judging = true; H.manual = false; hostBroadcast();
-      Judge.run(judgeKey(), H.prompt).then(function (ai) { applyAI(ai, Judge.provider(judgeKey())); }).catch(function (e) {
-        H.judgeNote = 'The AI pundit (' + Judge.provider(judgeKey()) + ') could not be reached (' + e.message + '). The league below uses the built-in formula for now.';
+      judgeRun(H.prompt).then(function (ai) { applyAI(ai, judgeName()); }).catch(function (e) {
+        H.judgeNote = 'The AI pundit (' + judgeName() + ') could not be reached (' + e.message + '). The league below uses the built-in formula for now; use ChatGPT below for a proper verdict.';
         H.manual = true;
       }).then(function () { H.judging = false; hostBroadcast(); });
     } else {

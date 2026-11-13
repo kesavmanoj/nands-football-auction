@@ -84,5 +84,15 @@ window.Judge = (function () {
     }).then(function (data) { return parse(prompt, data.choices[0].message.content); });
   }
 
-  return { buildPrompt: buildPrompt, parse: parse, run: run, provider: function (key) { return provider(key).name; } };
+  // The site's built-in pundit: a Cloudflare Worker that adds the secret DeepSeek key and passes the request on.
+  function runProxy(url, prompt) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ system: prompt.system, user: prompt.user }) })
+      .then(function (r) {
+        if (r.status === 402) throw new Error('the built-in pundit has run out of credit');
+        if (!r.ok) throw new Error('the built-in pundit said ' + r.status);
+        return r.json();
+      }).then(function (data) { return parse(prompt, data.choices[0].message.content); });
+  }
+
+  return { buildPrompt: buildPrompt, parse: parse, run: run, runProxy: runProxy, provider: function (key) { return provider(key).name; } };
 })();

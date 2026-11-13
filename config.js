@@ -1,12 +1,7 @@
 // Site-wide settings.
-// defaultKey: an AI key the site uses for every host who hasn't entered their own.
-// It is stored lightly scrambled (reversed, base64) so automated scanners don't pick it up,
-// but anyone who reads this file can still recover it: only put a prepaid key with a small balance here.
+// punditProxy: web address of the Cloudflare Worker that holds the DeepSeek key (see cloudflare-worker.js).
+// When set, every host gets the AI pundit without entering a key. The key itself never appears in this site.
 window.NFA_CONFIG = {
-  defaultKeyScrambled: '',
+  punditProxy: '',
   contactEmail: 'kesavmanoj85@gmail.com'
 };
-window.NFA_CONFIG.defaultKey = (function (s) {
-  if (!s) return '';
-  try { return atob(s).split('').reverse().join(''); } catch (e) { return ''; }
-})(window.NFA_CONFIG.defaultKeyScrambled);
