@@ -76,6 +76,12 @@
     // Opening price by tier: tier 1 opens at 5% of the budget, the lowest tier at the minimum bid, evenly spaced between.
     var n = opts.names.length, top = Math.max(g.minBid, Math.round(budget * 0.05));
     g.lots.forEach(function (l) { l.open = n === 1 ? top : Math.round(g.minBid + (top - g.minBid) * (n - l.tier) / (n - 1)); });
+    // Easter egg: an unbuyable legend opens the goalkeeper round. Priced at 10x the budget, so nobody can bid;
+    // once everyone passes (or time runs out) he goes unsold to nobody and the game carries on unchanged.
+    if (opts.easter) {
+      g.lots.unshift({ pos: 'GK', tier: 1, easter: true, open: budget * 10,
+        player: { id: -1, name: 'Nandagopan Biju', pos: 'GK', club: 'Goonpan FC', league: 'The Shadow League', nation: 'IND', prime: 'Forever', rating: 99, wiki: null, photo: 'nandagopan.jpg', mv: null } });
+    }
     return g;
   }
 
@@ -98,7 +104,7 @@
       g.lotIndex++;
       if (g.lotIndex >= g.lots.length) { g.phase = 'done'; g.current = null; return; }
       var who = needers(g);
-      if (who.length === 1) { assign(g, who[0], basePrice(g, who[0]), 'last'); continue; }
+      if (who.length === 1 && !lot(g).easter) { assign(g, who[0], basePrice(g, who[0]), 'last'); continue; }
       g.phase = 'bidding';
       g.current = { bid: null, leader: null, endsAt: now + g.timerMs, passed: {} };
       return;
@@ -140,6 +146,7 @@
   function checkAllPassed(g, now) {
     var c = g.current;
     var still = needers(g).filter(function (i) {
+      if (lot(g).easter) return !c.passed[i]; // nobody can afford him, but everyone gets to pass on him
       return i !== c.leader && !c.passed[i] && nextAmount(g, 1) <= maxBid(g, g.managers[i]);
     });
     if (still.length === 0) resolve(g, now);
@@ -147,7 +154,9 @@
 
   function resolve(g, now) {
     var c = g.current;
-    if (c.leader !== null) {
+    if (lot(g).easter) {
+      g.log.unshift({ lot: g.lotIndex, player: lot(g).player.name, pos: 'GK', manager: '', price: 0, how: 'easter' });
+    } else if (c.leader !== null) {
       assign(g, c.leader, c.bid, 'sold');
     } else {
       // Unsold: richest manager still needing the slot gets him at base value; ties broken at random.

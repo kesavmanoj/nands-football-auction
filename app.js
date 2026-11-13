@@ -90,7 +90,7 @@
   function hostStart() {
     if (H.lobby.length < 2) return;
     var names = H.lobby.map(function (p) { return p.name; });
-    H.g = E.createGame({ names: names, budget: H.settings.budget, timerSec: H.settings.timer, db: DB });
+    H.g = E.createGame({ names: names, budget: H.settings.budget, timerSec: H.settings.timer, db: DB, easter: H.lobby[0].name.trim().toLowerCase() === 'goonpan' });
     E.start(H.g, Date.now());
     H.screen = 'auction'; H.reveal = 0; H.result = null; H.judging = false; H.judgeNote = '';
     hostBroadcast();
@@ -173,11 +173,12 @@
       var l = E.lot(g), c = g.current, st = E.slotType(l.pos);
       v.auction = {
         lotNo: g.lotIndex + 1, lotsTotal: g.lots.length, slotLabel: st.label, pos: l.pos, minBid: l.open,
-        player: { name: l.player.name, tier: l.tier, club: l.player.club, league: l.player.league, nation: l.player.nation, prime: l.player.prime, wiki: l.player.wiki },
+        easter: !!l.easter,
+        player: { name: l.player.name, tier: l.tier, photo: l.player.photo || null, club: l.player.club, league: l.player.league, nation: l.player.nation, prime: l.player.prime, wiki: l.player.wiki },
         tiers: g.managers.length,
         round: g.lots.map(function (x, i) {
           var sold = g.log.filter(function (e) { return e.lot === i; })[0];
-          return { name: x.player.name, tier: x.tier, pos: x.pos, open: x.open, st: i < g.lotIndex ? 'past' : i === g.lotIndex ? 'now' : 'next', buyer: sold ? sold.manager : '', price: sold ? sold.price : null };
+          return { name: x.player.name, tier: x.tier, pos: x.pos, open: x.open, easter: !!x.easter, st: i < g.lotIndex ? 'past' : i === g.lotIndex ? 'now' : 'next', buyer: sold ? sold.manager : '', price: sold ? sold.price : null };
         }).filter(function (x) { return x.pos === l.pos; }),
         bid: c.bid, leader: c.leader, remainingMs: Math.max(0, c.endsAt - Date.now()), passed: Object.keys(c.passed).map(Number),
         managers: g.managers.map(function (m, i) {
@@ -333,6 +334,7 @@
   function logLine(e) {
     if (!e) return '';
     var who = '<strong>' + esc(e.manager) + '</strong>';
+    if (e.how === 'easter') return 'Nobody could afford <strong>' + esc(e.player) + '</strong>. Some legends can\'t be bought.';
     if (e.how === 'sold') return 'SOLD: ' + esc(e.player) + ' → ' + who + ' for ' + money(e.price);
     if (e.how === 'unsold') return 'No bids: ' + esc(e.player) + ' → ' + who + ' (most money left) at base value ' + money(e.price);
     return 'Only ' + who + ' still needed a ' + esc(e.pos) + ': ' + esc(e.player) + ' for ' + money(e.price);
@@ -364,7 +366,7 @@
 
     // Tier ladder: every player in this position, best tier first.
     var ladder = a.round.map(function (x) {
-      var sub = x.st === 'past' ? (x.buyer ? esc(x.buyer) + ' · ' + money(x.price) : 'sold')
+      var sub = x.st === 'past' ? (x.easter ? 'unbuyable' : x.buyer ? esc(x.buyer) + ' · ' + money(x.price) : 'sold')
         : x.st === 'now' ? 'NOW · opens ' + money(x.open) : 'opens ' + money(x.open);
       return '<div class="rung ' + tierClass(x.tier, a.tiers) + ' ' + x.st + '"><div class="rt">T' + x.tier + '</div><div class="rn">' + esc(x.name) + '</div><div class="rs">' + sub + '</div></div>';
     }).join('');
@@ -381,7 +383,7 @@
       '<div class="ladder">' + ladder + '</div>' +
       '<div style="text-align:center"><div class="tierflag ' + tierClass(p.tier, a.tiers) + '">' + tierLabel(p.tier, a.tiers) + '</div></div>' +
       '<div class="shield ' + tierClass(p.tier, a.tiers) + ' bigcard"><div class="ovr"><div class="display" style="font-size:42px;line-height:1">??</div><div class="display" style="font-size:18px">' + esc(a.pos) + '</div><span class="tag">' + esc(p.nation) + '</span></div>' +
-      '<img class="photo" alt="' + esc(p.name) + '" data-photo="' + esc(p.wiki) + '" style="visibility:hidden">' +
+      (p.photo ? '<img class="photo" alt="' + esc(p.name) + '" src="' + esc(p.photo) + '">' : '<img class="photo" alt="' + esc(p.name) + '" data-photo="' + esc(p.wiki) + '" style="visibility:hidden">') +
       '<div class="info"><div class="display" style="font-size:' + (p.name.length > 12 ? 22 : 28) + 'px;line-height:1">' + esc(p.name.toUpperCase()) + '</div>' +
       '<div style="font-size:12px;font-weight:600">' + esc(p.club) + '</div><div style="font-size:11px;font-weight:700">' + esc(p.league) + ' · PRIME ' + esc(p.prime) + '</div></div></div>' +
       '<div class="bidrow"><div class="box"><div id="timer" class="display" style="font-size:34px;line-height:1">' + clock(secs) + '</div><div class="small muted">time left</div></div>' +
