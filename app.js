@@ -145,8 +145,8 @@
     H.screen = 'results';
     if (H.key) {
       H.judging = true; H.manual = false; hostBroadcast();
-      Judge.run(H.key, H.prompt).then(function (ai) { applyAI(ai, 'ai'); }).catch(function (e) {
-        H.judgeNote = 'The AI pundit (Groq) could not be reached (' + e.message + '). The league below uses the built-in formula for now.';
+      Judge.run(H.key, H.prompt).then(function (ai) { applyAI(ai, Judge.provider(H.key)); }).catch(function (e) {
+        H.judgeNote = 'The AI pundit (' + Judge.provider(H.key) + ') could not be reached (' + e.message + '). The league below uses the built-in formula for now.';
         H.manual = true;
       }).then(function () { H.judging = false; hostBroadcast(); });
     } else {
@@ -299,8 +299,8 @@
       ? '<div class="row"><div style="flex:1"><label for="budget">BUDGET</label><select id="budget">' + opt([300, 400, 500, 600, 700, 800, 900], v.settings.budget, money) + '</select></div>' +
         '<div style="flex:1"><label for="timerSel">TIME PER PLAYER</label><select id="timerSel">' + opt([60, 120, 180, 300], v.settings.timer, function (x) { return (x / 60) + ' min'; }) + '</select></div></div>' +
         '<details' + (H.key ? '' : ' open') + '><summary class="small">AI pundit (optional)</summary><div class="stack" style="gap:8px;margin-top:6px">' +
-        '<div class="small muted">Paste your free Groq API key to have the AI judge the squads. It stays on this device and only goes to Groq. Without it, a built-in formula scores the game.</div>' +
-        '<input id="groq" type="password" autocomplete="off" placeholder="gsk_…" value="' + esc(H.key) + '">' +
+        '<div class="small muted">Paste a Groq key (free, starts gsk_) or a DeepSeek key (starts sk-) to have the AI judge the squads. It stays on this device and only goes to that AI. Without one, you can use ChatGPT copy-and-paste at the end, or the built-in formula.</div>' +
+        '<input id="groq" type="password" autocomplete="off" placeholder="gsk_… or sk-…" value="' + esc(H.key) + '">' +
         '<label class="row small" style="gap:8px"><input id="remember" type="checkbox" style="width:20px;height:20px"' + (H.remember ? ' checked' : '') + '> Remember on this device</label></div></details>'
       : '<div class="row between small"><span class="muted">Budget</span><strong>' + money(v.settings.budget) + '</strong></div><div class="row between small"><span class="muted">Time per player</span><strong>' + (v.settings.timer / 60) + ' min</strong></div><div class="row between small"><span class="muted">Judge</span><strong>' + (v.hasKey ? 'AI pundit' : 'Built-in formula') + '</strong></div>';
     app.innerHTML = '<div class="stack">' +
@@ -454,7 +454,7 @@
     var ratings = r.rows.map(function (x) {
       return '<tr><td><strong>' + esc(x.name) + '</strong></td><td>' + x.quality + '</td><td>' + x.balance + '</td><td>' + x.chem + '</td><td style="text-align:right"><strong>' + x.total + '</strong></td></tr>';
     }).join('');
-    var by = r.by === 'ai' ? 'the AI pundit (Groq)' : r.by === 'chatgpt' ? 'ChatGPT' : 'the built-in formula';
+    var by = r.by === 'chatgpt' ? 'ChatGPT' : r.by === 'formula' ? 'the built-in formula' : 'the AI pundit (' + r.by + ')';
     var verdicts = r.rows.filter(function (x) { return x.verdict; }).map(function (x) {
       return '<div class="panel"><div class="small" style="color:var(--gold);font-weight:700">PUNDIT ON ' + esc(x.name.toUpperCase()) + '</div><div style="margin:4px 0;line-height:1.4">' + esc(x.verdict) + '</div>' +
         (x.best ? '<div class="small muted">Best signing: <strong style="color:var(--ink)">' + esc(x.best) + '</strong></div>' : '') + (x.weak ? '<div class="small muted">Weak link: <strong style="color:var(--ink)">' + esc(x.weak) + '</strong></div>' : '') + '</div>';
@@ -469,10 +469,12 @@
       manual = '<div class="panel stack" style="gap:8px;border-color:var(--gold)"><div class="small" style="color:var(--gold);font-weight:700;letter-spacing:.5px">GET THE PUNDIT\'S VERDICT FROM CHATGPT</div>' +
         '<div class="small muted">1. Copy this and paste it into ChatGPT (or any AI chat).</div>' +
         '<textarea id="promptText" readonly rows="5">' + esc(H.prompt.text) + '</textarea><button data-act="copyPrompt">Copy prompt</button>' +
-        '<div class="small muted">2. Paste ChatGPT\'s whole reply here. The league is then replayed with its ratings.</div>' +
+        '<div class="small muted">2. In ChatGPT, tap <strong>Copy</strong> on the code box it replies with, then tap <strong>Paste &amp; use</strong> below. The league is then replayed with its ratings.</div>' +
+        '<button class="btn-green" data-act="pasteReply" style="width:100%">PASTE &amp; USE CHATGPT\'S REPLY</button>' +
+        '<div class="small muted">If pasting is blocked, paste into this box yourself and tap Use this verdict.</div>' +
         '<textarea id="reply" rows="5" placeholder="{ &quot;teams&quot;: [ … ] }">' + esc(H.replyDraft || '') + '</textarea>' +
         (H.manualError ? '<div class="warn">' + esc(H.manualError) + '</div>' : '') +
-        '<button class="btn-green" data-act="useReply" style="width:100%">USE THIS VERDICT</button></div>';
+        '<button data-act="useReply" style="width:100%">Use this verdict</button></div>';
     } else if (v.manual && !host) {
       manual = '<div class="panel small muted">The host can get the pundit\'s verdict from ChatGPT. When they do, the league is replayed and this page updates.</div>';
     }
@@ -539,6 +541,12 @@
       return;
     }
     else if (act === 'useReply') { hostPasteReply(document.getElementById('reply').value); return; }
+    else if (act === 'pasteReply') {
+      var fail = function () { H.manualError = 'Your browser blocked reading the clipboard. Long-press the box below, tap Paste, then tap Use this verdict.'; render(); };
+      if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function (txt) { H.replyDraft = txt; hostPasteReply(txt); }, fail);
+      else fail();
+      return;
+    }
     else if (act === 'copy') {
       var msg = "Join my Nand's Football Auction game: " + location.href.split('#')[0] + ' (room code ' + S.code + ')';
       if (navigator.clipboard) navigator.clipboard.writeText(msg).then(function () { b.textContent = 'Copied!'; }, function () { b.textContent = msg; });

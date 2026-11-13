@@ -194,10 +194,11 @@
       for (var k in m.squad) m.squad[k].forEach(function (e) { all.push(e); });
       var ratings = all.map(function (e) { return e.player.rating; });
       var avg = ratings.reduce(function (a, b) { return a + b; }, 0) / ratings.length;
-      var min = Math.min.apply(null, ratings);
+      var sd = Math.sqrt(ratings.reduce(function (a, r) { return a + (r - avg) * (r - avg); }, 0) / ratings.length);
       var spent = all.reduce(function (a, e) { return a + e.price; }, 0);
       var quality = round1(clamp((avg - 60) / 3.5));
-      var balance = round1(clamp(10 - (avg - min) * 0.4));
+      // Balance: how evenly strong the 12 are. One weak link costs a little; a team of stars and flops costs a lot.
+      var balance = round1(clamp(10 - sd * 0.55));
       var chem = chemistry(m);
       var total = round1(quality * 7 + balance * 2 + chem.total / 33 * 10);
       return { index: i, name: m.name, quality: quality, balance: balance, chem: chem.total, chemPer: chem.per, total: total, spent: spent, left: m.money, avg: round1(avg) };

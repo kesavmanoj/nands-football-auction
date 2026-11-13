@@ -35,7 +35,8 @@ window.Judge = (function () {
         return c.pos + ': ' + c.name + ' (' + c.club + ', ' + c.nation + ', ' + c.league + ', prime ' + c.prime + ', rating ' + c.rating + ', paid $' + c.price + 'M)';
       }).join('\n');
     }).join('\n\n');
-    return { order: order.map(function (t) { return t.index; }), system: SYSTEM, user: user, text: SYSTEM + '\n\n' + user };
+    var copyNote = '\n\nPut the JSON in a single ```json code block and write nothing else, so it can be copied with one click.';
+    return { order: order.map(function (t) { return t.index; }), system: SYSTEM, user: user, text: SYSTEM + '\n\n' + user + copyNote };
   }
 
   function letterOf(x) { return LETTERS.indexOf(String(x || '').replace(/team\s*/i, '').trim().charAt(0).toUpperCase()); }
@@ -64,17 +65,24 @@ window.Judge = (function () {
     return { byIndex: byIndex, smart: sbPos >= 0 && sbPos < prompt.order.length ? { index: prompt.order[sbPos], reason: scrub(sb.reason) } : null };
   }
 
+  // Groq keys start "gsk_"; DeepSeek keys start "sk-". Both use the same OpenAI-style API.
+  function provider(key) {
+    if (/^gsk_/.test(key)) return { name: 'Groq', url: 'https://api.groq.com/openai/v1/chat/completions', model: MODEL };
+    return { name: 'DeepSeek', url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat' };
+  }
+
   function run(key, prompt) {
-    return fetch('https://api.groq.com/openai/v1/chat/completions', {
+    var pv = provider(key);
+    return fetch(pv.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({ model: MODEL, temperature: 0.3, response_format: { type: 'json_object' },
+      body: JSON.stringify({ model: pv.model, temperature: 0.3, response_format: { type: 'json_object' },
         messages: [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user }] })
     }).then(function (r) {
-      if (!r.ok) throw new Error('Groq said ' + r.status);
+      if (!r.ok) throw new Error(pv.name + ' said ' + r.status);
       return r.json();
     }).then(function (data) { return parse(prompt, data.choices[0].message.content); });
   }
 
-  return { buildPrompt: buildPrompt, parse: parse, run: run };
+  return { buildPrompt: buildPrompt, parse: parse, run: run, provider: function (key) { return provider(key).name; } };
 })();
