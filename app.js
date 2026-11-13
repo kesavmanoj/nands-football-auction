@@ -101,7 +101,7 @@
     E.SLOT_TYPES.forEach(function (s) {
       m.squad[s.pos].forEach(function (e) {
         var p = e.player;
-        out.push({ pos: s.pos, name: p.name, club: p.club, nation: p.nation, league: p.league, prime: p.prime, rating: p.rating, tier: e.tier, last: e.tier === H.g.managers.length && H.g.managers.length > 1, price: e.price, wiki: p.wiki,
+        out.push({ pos: s.pos, name: p.name, club: p.club, nation: p.nation, league: p.league, prime: p.prime, rating: p.rating, tier: e.tier, last: e.tier === H.g.managers.length && H.g.managers.length > 1, price: e.price, mv: p.mv, mvEst: p.mvEst, wiki: p.wiki,
           chem: s.pos === 'MGR' ? null : (chemPer[p.id] || 0) });
       });
     });
@@ -297,7 +297,7 @@
     }).join('');
     var settings = host
       ? '<div class="row"><div style="flex:1"><label for="budget">BUDGET</label><select id="budget">' + opt([300, 400, 500, 600, 700, 800, 900], v.settings.budget, money) + '</select></div>' +
-        '<div style="flex:1"><label for="timer">TIME PER PLAYER</label><select id="timer">' + opt([60, 120, 180, 300], v.settings.timer, function (x) { return (x / 60) + ' min'; }) + '</select></div></div>' +
+        '<div style="flex:1"><label for="timerSel">TIME PER PLAYER</label><select id="timerSel">' + opt([60, 120, 180, 300], v.settings.timer, function (x) { return (x / 60) + ' min'; }) + '</select></div></div>' +
         '<details' + (H.key ? '' : ' open') + '><summary class="small">AI pundit (optional)</summary><div class="stack" style="gap:8px;margin-top:6px">' +
         '<div class="small muted">Paste your free Groq API key to have the AI judge the squads. It stays on this device and only goes to Groq. Without it, a built-in formula scores the game.</div>' +
         '<input id="groq" type="password" autocomplete="off" placeholder="gsk_…" value="' + esc(H.key) + '">' +
@@ -392,8 +392,21 @@
   function cardHtml(c) {
     return '<div style="text-align:center"><div class="shield mini ' + (c.last ? 'tlast' : 't' + Math.min(4, c.tier)) + '"><div class="display" style="font-size:28px;line-height:1">' + c.rating + '</div><div class="display" style="font-size:14px">' + c.pos + '</div></div>' +
       '<img class="avatar" alt="" data-photo="' + esc(c.wiki) + '" style="visibility:hidden">' +
-      '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.name) + '</div><div class="small muted">' + money(c.price) + '</div>' +
+      '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.name) + '</div>' +
+      '<div class="paid">paid ' + money(c.price) + '</div>' + (c.mv ? '<div class="worth">worth €' + c.mv + 'M' + (c.mvEst ? '*' : '') + '</div>' : '') +
       (c.chem === null ? '' : '<div class="small" style="color:var(--gold);letter-spacing:1px">' + diamonds(c.chem) + '</div>') + '</div>';
+  }
+
+  function teamMoney(cards) {
+    var paid = 0, worth = 0;
+    cards.forEach(function (c) { paid += c.price; if (c.mv) worth += c.mv; });
+    return { paid: paid, worth: worth };
+  }
+  function moneyLine(cards) {
+    var t = teamMoney(cards);
+    return '<div class="row between" style="margin-top:8px"><div><div class="small muted">PAID</div><div class="display" style="font-size:22px">' + money(t.paid) + '</div></div>' +
+      '<div style="text-align:right"><div class="small muted">REAL PEAK VALUE</div><div class="display" style="font-size:22px;color:var(--green)">€' + t.worth + 'M</div></div></div>' +
+      '<div class="small muted">Peak market values are approximate; * = estimated (prime before Transfermarkt\'s data). Managers have no value.</div>';
   }
 
   // Squad drawn as a 4-4-2 on a pitch, manager underneath.
@@ -418,6 +431,7 @@
       '<div class="panel"><div class="row between"><span class="small muted" style="font-weight:700">TEAM CHEMISTRY</span><span class="display" style="font-size:22px;color:var(--gold)">' + r.chem + ' / 33</span></div>' +
       '<div style="height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px"><div style="height:100%;width:' + Math.round(r.chem / 33 * 100) + '%;background:var(--gold)"></div></div>' +
       '<div class="small muted" style="margin-top:8px">Card colour = tier: gold, silver, bronze, slate; dark red = lucky dip. ◆ = chemistry points.</div></div>' +
+      '<div class="panel">' + moneyLine(r.cards) + '</div>' +
       (host ? '<button class="btn-gold" data-act="nextReveal">' + (last ? 'SEE THE VERDICT' : 'NEXT TEAM') + '</button>' : '<div class="panel small muted" style="text-align:center">The host controls the reveal.</div>') +
       '</div>';
   }
@@ -447,7 +461,8 @@
     }).join('');
     var smartName = r.rows.filter(function (x) { return x.index === r.smart.index; })[0];
     var squads = r.rows.map(function (x) {
-      return '<details class="panel"><summary>' + esc(x.name) + ' · spent ' + money(x.spent) + '</summary><div style="margin-top:8px">' + pitch(r.squads[x.index]) + '</div></details>';
+      var tm = teamMoney(r.squads[x.index]);
+      return '<details class="panel"><summary>' + esc(x.name) + ' · paid ' + money(tm.paid) + ' · worth €' + tm.worth + 'M</summary><div style="margin-top:8px">' + pitch(r.squads[x.index]) + moneyLine(r.squads[x.index]) + '</div></details>';
     }).join('');
     var manual = '';
     if (v.manual && host && H && H.prompt) {
@@ -534,7 +549,7 @@
   app.addEventListener('change', function (ev) {
     var t = ev.target; if (!H) return;
     if (t.id === 'budget') { H.settings.budget = Number(t.value); hostBroadcast(); }
-    else if (t.id === 'timer') { H.settings.timer = Number(t.value); hostBroadcast(); }
+    else if (t.id === 'timerSel') { H.settings.timer = Number(t.value); hostBroadcast(); }
     else if (t.id === 'remember') { H.remember = t.checked; setKey(H.key, H.remember); }
     else if (t.id === 'groq') { H.key = t.value.trim(); setKey(H.key, H.remember); hostBroadcast(); }
   });

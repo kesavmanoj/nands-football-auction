@@ -75,3 +75,7 @@ details summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
 .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pmoney { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; }
 textarea { width: 100%; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 12px/1.4 ui-monospace, monospace; padding: 10px; resize: vertical; }
+.paid { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.worth { font-size: 10px; color: var(--green); font-weight: 600; white-space: nowrap; }
+.pitch .paid { color: #CFE8DA; }
+.pitch .worth { color: #9FF0C8; }

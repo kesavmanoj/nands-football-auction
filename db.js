@@ -142,9 +142,48 @@
     'Andy Carroll': 'Andy Carroll', 'Heskey': 'Emile Heskey', 'Bendtner': 'Nicklas Bendtner', 'Van Wolfswinkel': 'Ricky van Wolfswinkel', 'Macheda': 'Federico Macheda', 'Balotelli': 'Mario Balotelli',
     'Moyes': 'David Moyes', 'Frank de Boer': 'Frank de Boer', 'Solskjær': 'Ole Gunnar Solskjær', 'Tim Sherwood': 'Tim Sherwood', 'McClaren': 'Steve McClaren'
   };
+  // Approximate peak market value in € millions (Transfermarkt-style). Transfermarkt's data starts in the
+  // mid-2000s, so for players whose prime ended before 2005 the value is an estimate. Managers have none.
+  var MV = {
+    'Buffon': 40, 'Casillas': 40, 'Neuer': 45, 'Courtois': 75, 'Alisson': 70, 'Van der Sar': 12, 'Čech': 35, 'Kahn': 30, 'Schmeichel': 25,
+    'Ederson': 55, 'Oblak': 90, 'Donnarumma': 65, 'Lloris': 40,
+    'Cafu': 30, 'Lahm': 35, 'Dani Alves': 35, 'Carvajal': 40, 'Alexander-Arnold': 110, 'Zanetti': 25, 'Hakimi': 70, 'Gary Neville': 15,
+    'Kyle Walker': 50, 'Thuram': 30, 'Kimmich': 90, 'Salgado': 15,
+    'Maldini': 50, 'Beckenbauer': 50, 'Baresi': 45, 'Cannavaro': 35, 'Nesta': 40, 'Puyol': 30, 'Sergio Ramos': 50, 'Van Dijk': 100, 'Terry': 40,
+    'Ferdinand': 35, 'Vidić': 40, 'Piqué': 50, 'Thiago Silva': 50, 'Chiellini': 45, 'Hummels': 50, 'Rúben Dias': 80, 'Varane': 80, 'Godín': 40,
+    'Marquinhos': 75, 'Kompany': 40,
+    'Roberto Carlos': 40, 'Marcelo': 60, 'Ashley Cole': 30, 'Evra': 25, 'Jordi Alba': 50, 'Alaba': 65, 'Robertson': 70, 'Theo Hernández': 60,
+    'Alphonso Davies': 80, 'Lizarazu': 20, 'Zambrotta': 30, 'Brehme': 20,
+    'Beckham': 40, 'Figo': 50, 'Robben': 45, 'Salah': 150, 'Bernardo Silva': 90, 'Mahrez': 50, 'Di María': 60, 'Bale': 90, 'Saka': 150,
+    'Dembélé': 100, 'Lamine Yamal': 200, 'Sterling': 160,
+    'Zidane': 75, 'Xavi': 80, 'Iniesta': 70, 'Pirlo': 45, 'Gerrard': 50, 'Lampard': 50, 'Scholes': 30, 'Roy Keane': 35, 'Vieira': 40, 'Modrić': 50,
+    'Kroos': 80, 'De Bruyne': 150, 'Rodri': 130, 'Kaká': 70, 'Matthäus': 40, 'Platini': 50, 'Seedorf': 30, 'Makélélé': 25, 'Bellingham': 180, 'Ballack': 40,
+    'Ribéry': 50, 'Ronaldinho': 80, 'Neymar': 180, 'Hazard': 150, 'Giggs': 30, 'Nedvěd': 40, 'Pires': 30, 'Vinícius Júnior': 200, 'Mané': 120,
+    'Son Heung-min': 90, 'Kvaratskhelia': 90, 'Overmars': 25,
+    'Messi': 180, 'Cristiano Ronaldo': 120, 'Ronaldo Nazário': 70, 'Henry': 50, 'Shevchenko': 50, 'Lewandowski': 80, 'Benzema': 65, 'Haaland': 200,
+    'Mbappé': 200, 'Van Basten': 60, 'Batistuta': 40, 'Drogba': 35, 'Rooney': 70, 'Suárez': 90, 'Ibrahimović': 45, "Eto'o": 40, 'Kane': 150,
+    'Agüero': 75, 'Raúl': 45, 'Gerd Müller': 50,
+    'Joe Hart': 25, 'Pickford': 30, 'Reina': 20, 'Glen Johnson': 20, 'Zabaleta': 22, 'Ivanović': 22, 'Sagna': 18, 'Koscielny': 35, 'Mertesacker': 20,
+    'Škrtel': 22, 'Cahill': 22, 'Alderweireld': 45, 'Carragher': 15, 'Baines': 25, 'Clichy': 15, 'Luke Shaw': 45, 'Antonio Valencia': 22, 'Nani': 30,
+    'Jesús Navas': 25, 'Carrick': 25, 'Gareth Barry': 15, 'Henderson': 40, 'Arteta': 25, 'Malouda': 25, 'Park Ji-sung': 15, 'Zaha': 50,
+    'Defoe': 20, 'Džeko': 40, 'Vardy': 25, 'Giroud': 30,
+    'Scott Carson': 6, 'Karius': 12, 'Taibi': 5, 'Roy Carroll': 5, 'Rob Green': 8, 'Kepa': 35, 'Wan-Bissaka': 40, 'Zappacosta': 20, 'Rafael': 15,
+    'Calum Chambers': 18, 'Debuchy': 12, 'Phil Jones': 25, 'Maguire': 50, 'Mustafi': 30, 'Titus Bramble': 5, 'Bailly': 35, 'Lovren': 25,
+    'Brandon Williams': 15, 'Marcos Alonso': 35, 'Danny Rose': 30, 'Cissokho': 8, 'José Enrique': 10, 'Lingard': 35, 'Walcott': 30,
+    'Wright-Phillips': 18, 'Aaron Lennon': 15, 'Ashley Young': 20, 'Kléberson': 8, 'Djemba-Djemba': 4, 'Drinkwater': 30, 'Bakayoko': 35,
+    'Fred': 40, 'Cleverley': 15, 'Downing': 18, 'Gervinho': 15, 'Memphis': 40, 'Albert Riera': 10, 'Townsend': 18, 'Andy Carroll': 25,
+    'Heskey': 10, 'Bendtner': 12, 'Van Wolfswinkel': 10, 'Macheda': 5, 'Balotelli': 40
+  };
+  function primeEnd(prime) {
+    var parts = String(prime).split('–'), first = parts[0];
+    if (parts.length < 2) return Number(first);
+    var end = parts[1];
+    return end.length === 4 ? Number(end) : Number(first.slice(0, 4 - end.length) + end);
+  }
   var DB = RAW.map(function (line, i) {
     var f = line.split('|');
-    return { id: i, name: f[0], pos: f[1], club: f[2], league: LEAGUES[f[3]], nation: f[4], prime: f[5], rating: Number(f[6]), wiki: WIKI[f[0]] || f[0] };
+    return { id: i, name: f[0], pos: f[1], club: f[2], league: LEAGUES[f[3]], nation: f[4], prime: f[5], rating: Number(f[6]), wiki: WIKI[f[0]] || f[0],
+      mv: f[1] === 'MGR' ? null : (MV[f[0]] || null), mvEst: primeEnd(f[5]) < 2005 };
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = DB; else root.PLAYER_DB = DB;
 })(this);
