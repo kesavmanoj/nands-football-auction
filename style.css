@@ -79,3 +79,5 @@ textarea { width: 100%; border-radius: 12px; border: 1px solid var(--line); back
 .worth { font-size: 10px; color: var(--green); font-weight: 600; white-space: nowrap; }
 .pitch .paid { color: #CFE8DA; }
 .pitch .worth { color: #9FF0C8; }
+.site-footer { max-width: 480px; margin: 0 auto; padding: 18px 14px 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: center; line-height: 1.6; }
+.site-footer a { color: var(--gold); word-break: break-all; }

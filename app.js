@@ -17,6 +17,9 @@
   function clock(secs) { return secs >= 60 ? Math.floor(secs / 60) + ':' + ('0' + (secs % 60)).slice(-2) : String(secs); }
   function diamonds(n) { return '◆◆◆'.slice(0, n) + '◇◇◇'.slice(0, 3 - n); }
   function newCode() { var a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = ''; for (var i = 0; i < 5; i++) s += a[Math.floor(Math.random() * a.length)]; return s; }
+  function siteKey() { return (window.NFA_CONFIG && window.NFA_CONFIG.defaultKey) || ''; }
+  // The key used for judging: the host's own key if entered, otherwise the site's built-in one.
+  function judgeKey() { return (H && H.key) || siteKey(); }
   function getKey() { try { return localStorage.getItem('nfa-groq-key') || ''; } catch (e) { return ''; } }
   function setKey(k, remember) { try { if (remember && k) localStorage.setItem('nfa-groq-key', k); else localStorage.removeItem('nfa-groq-key'); } catch (e) {} }
 
@@ -143,10 +146,10 @@
     H.manualError = '';
     playLeague();
     H.screen = 'results';
-    if (H.key) {
+    if (judgeKey()) {
       H.judging = true; H.manual = false; hostBroadcast();
-      Judge.run(H.key, H.prompt).then(function (ai) { applyAI(ai, Judge.provider(H.key)); }).catch(function (e) {
-        H.judgeNote = 'The AI pundit (' + Judge.provider(H.key) + ') could not be reached (' + e.message + '). The league below uses the built-in formula for now.';
+      Judge.run(judgeKey(), H.prompt).then(function (ai) { applyAI(ai, Judge.provider(judgeKey())); }).catch(function (e) {
+        H.judgeNote = 'The AI pundit (' + Judge.provider(judgeKey()) + ') could not be reached (' + e.message + '). The league below uses the built-in formula for now.';
         H.manual = true;
       }).then(function () { H.judging = false; hostBroadcast(); });
     } else {
@@ -162,7 +165,7 @@
 
   // What everyone is allowed to see. Ratings and tiers are never included until the reveal.
   function buildView() {
-    var v = { screen: H.screen, code: S.code, settings: H.settings, lobby: H.lobby.map(function (p) { return { name: p.name, online: p.online }; }), hasKey: !!H.key };
+    var v = { screen: H.screen, code: S.code, settings: H.settings, lobby: H.lobby.map(function (p) { return { name: p.name, online: p.online }; }), hasKey: !!judgeKey() };
     var g = H.g;
     if (H.screen === 'auction' && g && g.phase === 'bidding') {
       var l = E.lot(g), c = g.current, st = E.slotType(l.pos);
@@ -298,7 +301,8 @@
     var settings = host
       ? '<div class="row"><div style="flex:1"><label for="budget">BUDGET</label><select id="budget">' + opt([300, 400, 500, 600, 700, 800, 900], v.settings.budget, money) + '</select></div>' +
         '<div style="flex:1"><label for="timerSel">TIME PER PLAYER</label><select id="timerSel">' + opt([60, 120, 180, 300], v.settings.timer, function (x) { return (x / 60) + ' min'; }) + '</select></div></div>' +
-        '<details' + (H.key ? '' : ' open') + '><summary class="small">AI pundit (optional)</summary><div class="stack" style="gap:8px;margin-top:6px">' +
+        '<details' + (H.key || siteKey() ? '' : ' open') + '><summary class="small">AI pundit' + (siteKey() && !H.key ? ': built in, ready to go' : ' (optional)') + '</summary><div class="stack" style="gap:8px;margin-top:6px">' +
+        (siteKey() ? '<div class="small" style="color:var(--green)">This site has a built-in AI pundit, so you don\'t need a key. If it runs out, paste your own key below or use ChatGPT at the end.</div>' : '') +
         '<div class="small muted">Paste a Groq key (free, starts gsk_) or a DeepSeek key (starts sk-) to have the AI judge the squads. It stays on this device and only goes to that AI. Without one, you can use ChatGPT copy-and-paste at the end, or the built-in formula.</div>' +
         '<input id="groq" type="password" autocomplete="off" placeholder="gsk_… or sk-…" value="' + esc(H.key) + '">' +
         '<label class="row small" style="gap:8px"><input id="remember" type="checkbox" style="width:20px;height:20px"' + (H.remember ? ' checked' : '') + '> Remember on this device</label></div></details>'
