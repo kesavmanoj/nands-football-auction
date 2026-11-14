@@ -120,7 +120,7 @@
     H.g.slots.forEach(function (s) {
       m.squad[s.pos].forEach(function (e, k) {
         var p = e.player;
-        out.push({ pos: s.pos, k: k, label: E.posLabel(H.g.formation, s.pos, k), name: p.name, club: p.club, nation: p.nation, league: p.league, prime: p.prime, rating: p.rating, tier: e.tier, last: e.tier === H.g.managers.length && H.g.managers.length > 1, price: e.price, mv: p.mv, mvEst: p.mvEst, wiki: p.wiki,
+        out.push({ pos: s.pos, k: k, label: E.posLabel(H.g.formation, s.pos, k), name: p.name, club: p.club, nation: p.nation, league: p.league, prime: p.prime, rating: p.rating, tier: e.tier, last: e.tier === H.g.managers.length && H.g.managers.length > 1, price: e.price, mv: p.mv, mvEst: p.mvEst, fee: p.fee || null, wiki: p.wiki,
           chem: s.pos === 'MGR' ? null : (chemPer[p.id] || 0) });
       });
     });
@@ -431,7 +431,7 @@
     return '<div style="text-align:center"><div class="shield mini ' + (c.last ? 'tlast' : 't' + Math.min(4, c.tier)) + '"><div class="display" style="font-size:28px;line-height:1">' + c.rating + '</div><div class="display" style="font-size:14px">' + (c.label || c.pos) + '</div></div>' +
       '<img class="avatar" alt="" data-photo="' + esc(c.wiki) + '" style="visibility:hidden">' +
       '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.name) + '</div>' +
-      '<div class="paid">paid ' + money(c.price) + '</div>' + (c.mv ? '<div class="worth">worth €' + c.mv + 'M' + (c.mvEst ? '*' : '') + '</div>' : '') +
+      '<div class="paid">paid ' + money(c.price) + '</div>' + (c.mv ? '<div class="worth" title="' + esc(c.fee ? 'Real fee: ' + c.fee + ', in today\'s money' : 'Estimated: no fee was paid around his prime') + '">value €' + c.mv + 'M' + (c.mvEst ? '*' : '') + '</div>' : '') +
       (c.chem === null ? '' : '<div class="small" style="color:var(--gold);letter-spacing:1px">' + diamonds(c.chem) + '</div>') + '</div>';
   }
 
@@ -443,8 +443,8 @@
   function moneyLine(cards) {
     var t = teamMoney(cards);
     return '<div class="row between" style="margin-top:8px"><div><div class="small muted">PAID</div><div class="display" style="font-size:22px">' + money(t.paid) + '</div></div>' +
-      '<div style="text-align:right"><div class="small muted">REAL PEAK VALUE</div><div class="display" style="font-size:22px;color:var(--green)">€' + t.worth + 'M</div></div></div>' +
-      '<div class="small muted">Peak market values are approximate; * = estimated (prime before Transfermarkt\'s data). Managers have no value.</div>';
+      '<div style="text-align:right"><div class="small muted">VALUE IN TODAY\'S MONEY</div><div class="display" style="font-size:22px;color:var(--green)">€' + t.worth + 'M</div></div></div>' +
+      '<div class="small muted">Value = the real transfer fee paid for each player around his prime (from Wikipedia), converted to today\'s money using the growth of European football revenue (Deloitte). * = estimated from similarly rated players, because no fee was paid around his prime. Managers have no value.</div>';
   }
 
   // Squad drawn as a 4-4-2 on a pitch, manager underneath.

@@ -151,39 +151,85 @@
     'Andy Carroll': 'Andy Carroll', 'Heskey': 'Emile Heskey', 'Bendtner': 'Nicklas Bendtner', 'Van Wolfswinkel': 'Ricky van Wolfswinkel', 'Macheda': 'Federico Macheda', 'Balotelli': 'Mario Balotelli',
     'Moyes': 'David Moyes', 'Frank de Boer': 'Frank de Boer', 'Solskjær': 'Ole Gunnar Solskjær', 'Tim Sherwood': 'Tim Sherwood', 'McClaren': 'Steve McClaren'
   };
-  // Approximate peak market value in € millions (Transfermarkt-style). Transfermarkt's data starts in the
-  // mid-2000s, so for players whose prime ended before 2005 the value is an estimate. Managers have none.
+  // Peak value in today's money (€ millions). Built from the real transfer fee paid for each player around his prime
+  // (English Wikipedia, read Nov 2026), scaled up by the growth of the European football market since that season
+  // (Deloitte Annual Review of Football Finance: €11.6bn in 2004/05 → €40.2bn in 2024/25). Players with no fee around
+  // their prime (one-club players, academy products) are estimated from the real fees of similarly rated players: see EST.
   var MV = {
-    'Buffon': 40, 'Casillas': 40, 'Neuer': 45, 'Courtois': 75, 'Alisson': 70, 'Van der Sar': 12, 'Čech': 35, 'Kahn': 30, 'Schmeichel': 25,
-    'Ederson': 55, 'Oblak': 90, 'Donnarumma': 65, 'Lloris': 40,
-    'Cafu': 30, 'Lahm': 35, 'Dani Alves': 35, 'Carvajal': 40, 'Alexander-Arnold': 110, 'Zanetti': 25, 'Hakimi': 70, 'Gary Neville': 15,
-    'Kyle Walker': 50, 'Thuram': 30, 'Kimmich': 90, 'Salgado': 15,
-    'Maldini': 50, 'Beckenbauer': 50, 'Baresi': 45, 'Cannavaro': 35, 'Nesta': 40, 'Puyol': 30, 'Sergio Ramos': 50, 'Van Dijk': 100, 'Terry': 40,
-    'Ferdinand': 35, 'Vidić': 40, 'Piqué': 50, 'Thiago Silva': 50, 'Chiellini': 45, 'Hummels': 50, 'Rúben Dias': 80, 'Varane': 80, 'Godín': 40,
-    'Marquinhos': 75, 'Kompany': 40,
-    'Roberto Carlos': 40, 'Marcelo': 60, 'Ashley Cole': 30, 'Evra': 25, 'Jordi Alba': 50, 'Alaba': 65, 'Robertson': 70, 'Theo Hernández': 60,
-    'Alphonso Davies': 80, 'Lizarazu': 20, 'Zambrotta': 30, 'Brehme': 20,
-    'Beckham': 40, 'Figo': 50, 'Robben': 45, 'Salah': 150, 'Bernardo Silva': 90, 'Mahrez': 50, 'Di María': 60, 'Bale': 90, 'Saka': 150,
-    'Dembélé': 100, 'Lamine Yamal': 200, 'Sterling': 160,
-    'Zidane': 75, 'Xavi': 80, 'Iniesta': 70, 'Pirlo': 45, 'Gerrard': 50, 'Lampard': 50, 'Scholes': 30, 'Roy Keane': 35, 'Vieira': 40, 'Modrić': 50,
-    'Kroos': 80, 'De Bruyne': 150, 'Rodri': 130, 'Kaká': 70, 'Matthäus': 40, 'Platini': 50, 'Seedorf': 30, 'Makélélé': 25, 'Bellingham': 180, 'Ballack': 40,
-    'Ribéry': 50, 'Ronaldinho': 80, 'Neymar': 180, 'Hazard': 150, 'Giggs': 30, 'Nedvěd': 40, 'Pires': 30, 'Vinícius Júnior': 200, 'Mané': 120,
-    'Son Heung-min': 90, 'Kvaratskhelia': 90, 'Overmars': 25,
-    'Messi': 180, 'Cristiano Ronaldo': 120, 'Ronaldo Nazário': 70, 'Henry': 50, 'Shevchenko': 50, 'Lewandowski': 80, 'Benzema': 65, 'Haaland': 200,
-    'Mbappé': 200, 'Van Basten': 60, 'Batistuta': 40, 'Drogba': 35, 'Rooney': 70, 'Suárez': 90, 'Ibrahimović': 45, "Eto'o": 40, 'Kane': 150,
-    'Agüero': 75, 'Raúl': 45, 'Gerd Müller': 50,
-    'Busquets': 60, 'Casemiro': 70, 'Yaya Touré': 50, 'Fàbregas': 60, 'Schweinsteiger': 45, 'Hierro': 25, 'Desailly': 30, 'Stam': 30,
-    'Foden': 150, 'Coman': 70, 'Rodrygo': 110, 'Cuadrado': 35, 'Sané': 90, 'Leão': 90, 'Luis Díaz': 85,
-    'Joe Hart': 25, 'Pickford': 30, 'Reina': 20, 'Glen Johnson': 20, 'Zabaleta': 22, 'Ivanović': 22, 'Sagna': 18, 'Koscielny': 35, 'Mertesacker': 20,
-    'Škrtel': 22, 'Cahill': 22, 'Alderweireld': 45, 'Carragher': 15, 'Baines': 25, 'Clichy': 15, 'Luke Shaw': 45, 'Antonio Valencia': 22, 'Nani': 30,
-    'Jesús Navas': 25, 'Carrick': 25, 'Gareth Barry': 15, 'Henderson': 40, 'Arteta': 25, 'Malouda': 25, 'Park Ji-sung': 15, 'Zaha': 50,
-    'Defoe': 20, 'Džeko': 40, 'Vardy': 25, 'Giroud': 30,
-    'Scott Carson': 6, 'Karius': 12, 'Taibi': 5, 'Roy Carroll': 5, 'Rob Green': 8, 'Kepa': 35, 'Wan-Bissaka': 40, 'Zappacosta': 20, 'Rafael': 15,
-    'Calum Chambers': 18, 'Debuchy': 12, 'Phil Jones': 25, 'Maguire': 50, 'Mustafi': 30, 'Titus Bramble': 5, 'Bailly': 35, 'Lovren': 25,
-    'Brandon Williams': 15, 'Marcos Alonso': 35, 'Danny Rose': 30, 'Cissokho': 8, 'José Enrique': 10, 'Lingard': 35, 'Walcott': 30,
-    'Wright-Phillips': 18, 'Aaron Lennon': 15, 'Ashley Young': 20, 'Kléberson': 8, 'Djemba-Djemba': 4, 'Drinkwater': 30, 'Bakayoko': 35,
-    'Fred': 40, 'Cleverley': 15, 'Downing': 18, 'Gervinho': 15, 'Memphis': 40, 'Albert Riera': 10, 'Townsend': 18, 'Andy Carroll': 25,
-    'Heskey': 10, 'Bendtner': 12, 'Van Wolfswinkel': 10, 'Macheda': 5, 'Balotelli': 40
+    "Buffon": 260, "Casillas": 98, "Neuer": 105, "Courtois": 54, "Alisson": 100, "Van der Sar": 64, "Čech": 34, "Kahn": 91,
+    "Schmeichel": 91, "Ederson": 57, "Oblak": 83, "Donnarumma": 30, "Lloris": 21, "Cafu": 83, "Lahm": 91, "Dani Alves": 85,
+    "Carvajal": 53, "Alexander-Arnold": 65, "Zanetti": 64, "Hakimi": 79, "Gary Neville": 30, "Kyle Walker": 81, "Thuram": 65, "Kimmich": 65,
+    "Salgado": 30, "Maldini": 165, "Beckenbauer": 165, "Baresi": 130, "Cannavaro": 100, "Nesta": 98, "Puyol": 83, "Sergio Ramos": 98,
+    "Van Dijk": 115, "Terry": 64, "Ferdinand": 195, "Vidić": 30, "Piqué": 65, "Thiago Silva": 89, "Chiellini": 64, "Hummels": 65,
+    "Rúben Dias": 91, "Varane": 53, "Godín": 65, "Marquinhos": 53, "Kompany": 65, "Roberto Carlos": 91, "Marcelo": 64, "Ashley Cole": 65,
+    "Evra": 24, "Jordi Alba": 30, "Alaba": 65, "Robertson": 53, "Theo Hernández": 27, "Alphonso Davies": 49, "Lizarazu": 49, "Zambrotta": 41,
+    "Brehme": 53, "Beckham": 65, "Figo": 340, "Robben": 62, "Salah": 60, "Bernardo Silva": 71, "Mahrez": 96, "Di María": 130,
+    "Bale": 205, "Saka": 53, "Dembélé": 53, "Lamine Yamal": 65, "Sterling": 115, "Zidane": 380, "Xavi": 105, "Iniesta": 105,
+    "Pirlo": 83, "Gerrard": 91, "Lampard": 79, "Scholes": 64, "Roy Keane": 64, "Vieira": 45, "Modrić": 74, "Kroos": 46,
+    "De Bruyne": 130, "Rodri": 98, "Kaká": 165, "Matthäus": 105, "Platini": 130, "Seedorf": 125, "Makélélé": 96, "Bellingham": 110,
+    "Ballack": 26, "Ribéry": 70, "Ronaldinho": 165, "Neymar": 315, "Hazard": 135, "Giggs": 53, "Nedvěd": 91, "Pires": 49,
+    "Vinícius Júnior": 64, "Mané": 64, "Son Heung-min": 51, "Kvaratskhelia": 70, "Overmars": 200, "Messi": 165, "Cristiano Ronaldo": 230, "Ronaldo Nazário": 155,
+    "Henry": 100, "Shevchenko": 130, "Lewandowski": 51, "Benzema": 91, "Haaland": 68, "Mbappé": 255, "Van Basten": 130, "Batistuta": 200,
+    "Drogba": 120, "Rooney": 130, "Suárez": 155, "Ibrahimović": 170, "Eto'o": 83, "Kane": 105, "Agüero": 91, "Raúl": 64,
+    "Gerd Müller": 130, "Busquets": 64, "Casemiro": 80, "Yaya Touré": 63, "Fàbregas": 65, "Schweinsteiger": 64, "Hierro": 64, "Desailly": 83,
+    "Stam": 110, "Foden": 64, "Coman": 30, "Rodrygo": 62, "Cuadrado": 51, "Sané": 70, "Leão": 48, "Luis Díaz": 51,
+    "Joe Hart": 30, "Pickford": 49, "Reina": 41, "Glen Johnson": 48, "Zabaleta": 30, "Ivanović": 32, "Sagna": 29, "Koscielny": 22,
+    "Mertesacker": 21, "Škrtel": 21, "Cahill": 17, "Alderweireld": 41, "Carragher": 41, "Baines": 25, "Clichy": 18, "Luke Shaw": 41,
+    "Antonio Valencia": 44, "Nani": 71, "Jesús Navas": 35, "Carrick": 81, "Gareth Barry": 33, "Henderson": 52, "Arteta": 26, "Malouda": 30,
+    "Park Ji-sung": 19, "Zaha": 35, "Defoe": 44, "Džeko": 71, "Vardy": 41, "Giroud": 29, "Scott Carson": 12, "Karius": 9,
+    "Taibi": 41, "Roy Carroll": 18, "Rob Green": 26, "Kepa": 110, "Wan-Bissaka": 79, "Zappacosta": 40, "Rafael": 26, "Calum Chambers": 35,
+    "Debuchy": 26, "Phil Jones": 43, "Maguire": 120, "Mustafi": 66, "Titus Bramble": 39, "Bailly": 57, "Lovren": 43, "Brandon Williams": 26,
+    "Marcos Alonso": 45, "Danny Rose": 26, "Cissokho": 37, "José Enrique": 26, "Lingard": 26, "Walcott": 26, "Wright-Phillips": 28, "Aaron Lennon": 5,
+    "Ashley Young": 44, "Kléberson": 37, "Djemba-Djemba": 20, "Drinkwater": 57, "Bakayoko": 65, "Fred": 75, "Cleverley": 26, "Downing": 52,
+    "Gervinho": 28, "Memphis": 59, "Albert Riera": 26, "Townsend": 23, "Andy Carroll": 91, "Heskey": 89, "Bendtner": 26, "Van Wolfswinkel": 20,
+    "Macheda": 26, "Balotelli": 51
+  };
+  var EST = ["Casillas","Neuer","Van der Sar","Kahn","Schmeichel","Oblak","Cafu","Lahm","Carvajal","Alexander-Arnold","Zanetti","Gary Neville","Thuram","Kimmich","Salgado","Maldini","Beckenbauer","Baresi","Nesta","Puyol","Sergio Ramos","Terry","Piqué","Chiellini","Hummels","Varane","Godín","Marquinhos","Kompany","Roberto Carlos","Marcelo","Ashley Cole","Alaba","Robertson","Alphonso Davies","Lizarazu","Brehme","Beckham","Saka","Lamine Yamal","Xavi","Iniesta","Pirlo","Gerrard","Scholes","Roy Keane","Matthäus","Platini","Ronaldinho","Giggs","Nedvěd","Messi","Benzema","Van Basten","Eto'o","Raúl","Gerd Müller","Busquets","Schweinsteiger","Hierro","Desailly","Foden","Joe Hart","Reina","Zabaleta","Alderweireld","Carragher","Luke Shaw","Malouda","Vardy","Rob Green","Rafael","Brandon Williams","Danny Rose","José Enrique","Lingard","Walcott","Cleverley","Bendtner","Macheda"];
+  var FEE = {
+    "Buffon": "Parma → Juventus 2001, €52.9M", "Courtois": "Chelsea → Real Madrid 2018, €38.8M", "Alisson": "Roma → Liverpool 2018, €72.5M",
+    "Čech": "Rennes → Chelsea 2004, €9.8M", "Ederson": "Benfica → Man City 2017, €40M", "Donnarumma": "PSG → Man City 2025, £26M",
+    "Lloris": "Lyon → Tottenham 2012, €10M", "Dani Alves": "Sevilla → Barcelona 2008, €32.5M", "Hakimi": "Inter → PSG 2021, €60M",
+    "Kyle Walker": "Tottenham → Man City 2017, £50M", "Cannavaro": "Parma → Inter 2002, €23M", "Van Dijk": "Southampton → Liverpool 2018, €84.4M",
+    "Ferdinand": "Leeds → Man United 2002, £30M", "Vidić": "Spartak → Man United 2006, £7M", "Thiago Silva": "Milan → PSG 2012, €42M",
+    "Rúben Dias": "Benfica → Man City 2020, €68M", "Evra": "Monaco → Man United 2006, £5.5M", "Jordi Alba": "Valencia → Barcelona 2012, €14M",
+    "Theo Hernández": "Real Madrid → Milan 2019, €20M", "Zambrotta": "Juventus → Barcelona 2006, €14M", "Figo": "Barcelona → Real Madrid 2000, €62M",
+    "Robben": "Real Madrid → Bayern 2009, €25M", "Salah": "Roma → Liverpool 2017, £36.9M", "Bernardo Silva": "Monaco → Man City 2017, €50M",
+    "Mahrez": "Leicester → Man City 2018, £60M", "Di María": "Real Madrid → Man United 2014, £59.7M", "Bale": "Tottenham → Real Madrid 2013, €100.8M",
+    "Dembélé": "Barcelona → PSG 2023, €50.4M", "Sterling": "Liverpool → Man City 2015, £49M", "Zidane": "Juventus → Real Madrid 2001, €77.5M",
+    "Lampard": "West Ham → Chelsea 2001, £11M", "Vieira": "Milan → Arsenal 1996, £3.5M", "Modrić": "Tottenham → Real Madrid 2012, £30M",
+    "Kroos": "Bayern → Real Madrid 2014, €25M", "De Bruyne": "Wolfsburg → Man City 2015, €75M", "Rodri": "Atlético → Man City 2019, £62.6M",
+    "Kaká": "Milan → Real Madrid 2009, €67M", "Seedorf": "Real Madrid → Inter 2000, €23M", "Makélélé": "Real Madrid → Chelsea 2003, £16.8M",
+    "Bellingham": "Dortmund → Real Madrid 2023, €103M", "Ballack": "Leverkusen → Bayern 2002, €6M", "Ribéry": "Marseille → Bayern 2007, €25M",
+    "Neymar": "Barcelona → PSG 2017, €222M", "Hazard": "Chelsea → Real Madrid 2019, €100M", "Pires": "Marseille → Arsenal 2000, £6M",
+    "Vinícius Júnior": "Flamengo → Real Madrid 2018, €46M", "Mané": "Southampton → Liverpool 2016, £34M", "Son Heung-min": "Leverkusen → Tottenham 2015, €30M",
+    "Kvaratskhelia": "Napoli → PSG 2025, €70M", "Overmars": "Arsenal → Barcelona 2000, £25M", "Cristiano Ronaldo": "Man United → Real Madrid 2009, €94M",
+    "Ronaldo Nazário": "PSV → Barcelona 1996, $19.5M", "Henry": "Juventus → Arsenal 1999, £11M", "Shevchenko": "Milan → Chelsea 2006, €43.875M",
+    "Lewandowski": "Bayern → Barcelona 2022, €45M", "Haaland": "Dortmund → Man City 2022, €60M", "Mbappé": "Monaco → PSG 2017, €180M",
+    "Batistuta": "Fiorentina → Roma 2000, €36M", "Drogba": "Marseille → Chelsea 2004, £24M", "Rooney": "Everton → Man United 2004, £25.6M",
+    "Suárez": "Liverpool → Barcelona 2014, €82.3M", "Ibrahimović": "Inter → Barcelona 2009, €69.884M", "Kane": "Tottenham → Bayern 2023, €100M",
+    "Agüero": "Atlético → Man City 2011, £35M", "Casemiro": "Real Madrid → Man United 2022, €70.65M", "Yaya Touré": "Barcelona → Man City 2010, £24M",
+    "Fàbregas": "Arsenal → Barcelona 2011, €29M", "Stam": "PSV → Man United 1998, £10.6M", "Coman": "Juventus → Bayern 2017, €21M",
+    "Rodrygo": "Santos → Real Madrid 2019, €45M", "Cuadrado": "Fiorentina → Chelsea 2015, €30M", "Sané": "Schalke → Man City 2016, £37M",
+    "Leão": "Lille → Milan 2019, €35M", "Luis Díaz": "Porto → Liverpool 2022, €45M", "Pickford": "Sunderland → Everton 2017, £30M",
+    "Glen Johnson": "Portsmouth → Liverpool 2009, £17.5M", "Ivanović": "Lokomotiv → Chelsea 2008, £9.7M", "Sagna": "Auxerre → Arsenal 2007, £7M",
+    "Koscielny": "Lorient → Arsenal 2010, £8.45M", "Mertesacker": "Werder → Arsenal 2011, £8M", "Škrtel": "Zenit → Liverpool 2008, £6.5M",
+    "Cahill": "Bolton → Chelsea 2012, £7M", "Baines": "Wigan → Everton 2007, £6M", "Clichy": "Arsenal → Man City 2011, £7M",
+    "Antonio Valencia": "Wigan → Man United 2009, £16M", "Nani": "Sporting → Man United 2007, €25.5M", "Jesús Navas": "Sevilla → Man City 2013, £14.9M",
+    "Carrick": "Tottenham → Man United 2006, £18.6M", "Gareth Barry": "Aston Villa → Man City 2009, £12M", "Henderson": "Sunderland → Liverpool 2011, £20M",
+    "Arteta": "Everton → Arsenal 2011, £10M", "Park Ji-sung": "PSV → Man United 2005, £4M", "Zaha": "Crystal Palace → Man United 2013, £15M",
+    "Defoe": "Portsmouth → Tottenham 2009, £15.75M", "Džeko": "Wolfsburg → Man City 2011, €32M", "Giroud": "Arsenal → Chelsea 2018, £18M",
+    "Scott Carson": "Liverpool → West Brom 2008, £3.75M", "Karius": "Mainz → Liverpool 2016, £4.75M", "Taibi": "Venezia → Man United 1999, £4.5M",
+    "Roy Carroll": "Wigan → Man United 2001, £2.5M", "Kepa": "Athletic Bilbao → Chelsea 2018, €80M", "Wan-Bissaka": "Crystal Palace → Man United 2019, £50M",
+    "Zappacosta": "Torino → Chelsea 2017, €28M", "Calum Chambers": "Southampton → Arsenal 2014, £16M", "Debuchy": "Newcastle → Arsenal 2014, £12M",
+    "Phil Jones": "Blackburn → Man United 2011, £16.5M", "Maguire": "Leicester → Man United 2019, €86.6M", "Mustafi": "Valencia → Arsenal 2016, £35M",
+    "Titus Bramble": "Ipswich → Newcastle 2002, £6M", "Bailly": "Villarreal → Man United 2016, £30M", "Lovren": "Southampton → Liverpool 2014, £20M",
+    "Marcos Alonso": "Fiorentina → Chelsea 2016, £24M", "Cissokho": "Porto → Lyon 2009, €15M", "Wright-Phillips": "Chelsea → Man City 2008, £8.5M",
+    "Aaron Lennon": "Leeds → Tottenham 2005, £1M", "Ashley Young": "Aston Villa → Man United 2011, £17M", "Kléberson": "Atlético Paranaense → Man United 2003, £6.5M",
+    "Djemba-Djemba": "Nantes → Man United 2003, £3.5M", "Drinkwater": "Leicester → Chelsea 2017, £35M", "Bakayoko": "Monaco → Chelsea 2017, £40M",
+    "Fred": "Shakhtar → Man United 2018, £47M", "Downing": "Aston Villa → Liverpool 2011, £20M", "Gervinho": "Lille → Arsenal 2011, £10.8M",
+    "Memphis": "PSV → Man United 2015, £25M", "Albert Riera": "Espanyol → Liverpool 2008, £8M", "Townsend": "Tottenham → Newcastle 2016, £12M",
+    "Andy Carroll": "Newcastle → Liverpool 2011, £35M", "Heskey": "Leicester → Liverpool 2000, £11M", "Van Wolfswinkel": "Sporting → Norwich 2013, £8.5M",
+    "Balotelli": "Inter → Man City 2010, €21.8M"
   };
   function primeEnd(prime) {
     var parts = String(prime).split('–'), first = parts[0];
@@ -194,7 +240,7 @@
   var DB = RAW.map(function (line, i) {
     var f = line.split('|');
     return { id: i, name: f[0], pos: f[1], club: f[2], league: LEAGUES[f[3]], nation: f[4], prime: f[5], rating: Number(f[6]), wiki: WIKI[f[0]] || f[0],
-      mv: f[1] === 'MGR' ? null : (MV[f[0]] || null), mvEst: primeEnd(f[5]) < 2005 };
+      mv: f[1] === 'MGR' ? null : (MV[f[0]] || null), mvEst: EST.indexOf(f[0]) >= 0, fee: FEE[f[0]] || null };
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = DB; else root.PLAYER_DB = DB;
 })(this);
